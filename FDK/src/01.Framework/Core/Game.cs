@@ -22,8 +22,10 @@
 using FDK;
 using Silk.NET.Core;
 using Silk.NET.GLFW;
+using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGLES;
+using Silk.NET.OpenGLES.Extensions.ImGui;
 using Silk.NET.Windowing;
 using SkiaSharp;
 
@@ -34,6 +36,15 @@ namespace SampleFramework {
 	public abstract class Game : IDisposable {
 		public static GL Gl { get; private set; }
 		public static Silk.NET.Core.Contexts.IGLContext Context { get; private set; }
+
+		public static ImGuiController ImGuiController { get; private set; }
+
+		static string _test = "";
+		public static void InitImGuiController(IView window, IInputContext context) {
+			if (ImGuiController != null) return;
+
+			ImGuiController = new ImGuiController(Gl, window, context);
+		}
 
 		public static List<Action> AsyncActions { get; private set; } = new();
 
@@ -386,6 +397,8 @@ namespace SampleFramework {
 			TimeMs = (long)(Window_.Time * 1000);
 
 			Update();
+
+			ImGuiController?.Update((float)deltaTime);
 		}
 
 		public void Window_Render(double deltaTime) {
@@ -400,6 +413,10 @@ namespace SampleFramework {
 			Draw();
 
 			double fps = 1.0f / deltaTime;
+
+#if DEBUG
+			ImGuiController?.Render();
+#endif
 
 			Context.SwapBuffers();
 		}
@@ -419,6 +436,7 @@ namespace SampleFramework {
 
 			ViewPortOffset.X = (size.X - ViewPortSize.X) / 2;
 			ViewPortOffset.Y = (size.Y - ViewPortSize.Y) / 2;
+
 
 			Gl.Viewport(ViewPortOffset.X, ViewPortOffset.Y, (uint)ViewPortSize.X, (uint)ViewPortSize.Y);
 		}
