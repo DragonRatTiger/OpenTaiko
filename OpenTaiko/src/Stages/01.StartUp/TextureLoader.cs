@@ -1426,6 +1426,10 @@ class TextureLoader {
 		}
 
 		string charaPath = OpenTaiko.strEXEのあるフォルダ + GLOBAL + CHARACTERS + OpenTaiko.Skin.Characters_DirName[newC];
+		//if (newC > 0) {
+		//	LuaCharacter test = new(OpenTaiko.Skin.Characters_DirName[newC]);
+		//	test.LoadCharacter();
+		//}
 
 		if ((newC >= 0 &&
 			 OpenTaiko.SaveFileInstances[0].data.Character != newC &&

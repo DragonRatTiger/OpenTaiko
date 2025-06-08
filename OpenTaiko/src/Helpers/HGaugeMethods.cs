@@ -644,10 +644,10 @@ class HGaugeMethods {
 			soulFire_x = OpenTaiko.Skin.Result_Soul_Fire_5P[0] + OpenTaiko.Skin.Result_UIMove_5P_X[pos];
 			soulFire_y = OpenTaiko.Skin.Result_Soul_Fire_5P[1] + OpenTaiko.Skin.Result_UIMove_5P_Y[pos];
 		} else if (OpenTaiko.ConfigIni.nPlayerCount == 4 || OpenTaiko.ConfigIni.nPlayerCount == 3) {
-			soulText_x = OpenTaiko.Skin.Result_Soul_Text_4P[0] + OpenTaiko.Skin.Result_UIMove_4P_X[0];
-			soulText_y = OpenTaiko.Skin.Result_Soul_Text_4P[1] + OpenTaiko.Skin.Result_UIMove_4P_Y[1];
-			soulFire_x = OpenTaiko.Skin.Result_Soul_Fire_4P[0] + OpenTaiko.Skin.Result_UIMove_4P_X[0];
-			soulFire_y = OpenTaiko.Skin.Result_Soul_Fire_4P[1] + OpenTaiko.Skin.Result_UIMove_4P_Y[1];
+			soulText_x = OpenTaiko.Skin.Result_Soul_Text_4P[0] + OpenTaiko.Skin.Result_UIMove_4P_X[pos];
+			soulText_y = OpenTaiko.Skin.Result_Soul_Text_4P[1] + OpenTaiko.Skin.Result_UIMove_4P_Y[pos];
+			soulFire_x = OpenTaiko.Skin.Result_Soul_Fire_4P[0] + OpenTaiko.Skin.Result_UIMove_4P_X[pos];
+			soulFire_y = OpenTaiko.Skin.Result_Soul_Fire_4P[1] + OpenTaiko.Skin.Result_UIMove_4P_Y[pos];
 		} else {
 			soulText_x = OpenTaiko.Skin.Result_Soul_Text_X[pos] + uioffset_x;
 			soulText_y = OpenTaiko.Skin.Result_Soul_Text_Y[pos];

@@ -769,6 +769,8 @@ internal abstract class CStage演奏画面共通 : CStage {
 			if (OpenTaiko.ConfigIni.nAILevel > 1)
 				OpenTaiko.ConfigIni.nAILevel--;
 		}
+		OpenTaiko.NamePlate.tNamePlateRefreshTitles(1);
+
 		actAIBattle.BatchAnimeCounter.CurrentValue = 0;
 		_AIBattleState = 0;
 
