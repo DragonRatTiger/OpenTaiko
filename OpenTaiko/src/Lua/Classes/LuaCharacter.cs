@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using FDK;
 
 namespace OpenTaiko {
-	public class LuaCharacter {
+	public class LuaCharacter : IDisposable {
 		public string FolderName { get; private set; } = "";
 
 		public Dictionary<string, Dictionary<string, LuaTexture[]>> Sprites { get; private set; } = new();
@@ -85,8 +85,53 @@ namespace OpenTaiko {
 				string name = Path.GetRelativePath(sound_path, dir);
 				Sounds.Add(name, loadSounds(dir));
 			}
-
-			int test = 0; // ez breakpoint
 		}
+
+		#region Dispose
+		private bool _disposedValue;
+
+		protected virtual void Dispose(bool disposing) {
+			if (!_disposedValue) {
+
+				// Sprites
+				for (int i = Sprites.Count - 1; i >= 0; i--) {
+					var sprite_sub = Sprites.ElementAt(i).Value;
+
+					for (int j = sprite_sub.Count - 1; j >= 0; j--) {
+						var sprites = sprite_sub.ElementAt(j).Value;
+
+						for (int k = sprites.Length - 1; k >= 0; k--) {
+							sprites[k]?.Dispose();
+						}
+
+						sprite_sub.Remove(sprite_sub.ElementAt(j).Key);
+					}
+
+					Sprites.Remove(Sprites.ElementAt(i).Key);
+				}
+
+				// Sounds
+				for (int i = Sounds.Count - 1; i >= 0; i--) {
+					var sound_sub = Sounds.ElementAt(i).Value;
+
+					for (int j = sound_sub.Count - 1; j >= 0; j--) {
+						var sound = sound_sub.ElementAt(j);
+						sound.Value?.Dispose();
+
+						sound_sub.Remove(sound.Key);
+					}
+
+					Sounds.Remove(Sounds.ElementAt(i).Key);
+				}
+
+				_disposedValue = true;
+			}
+		}
+
+		public void Dispose() {
+			Dispose(disposing: true);
+			GC.SuppressFinalize(this);
+		}
+		#endregion
 	}
 }
