@@ -1545,7 +1545,7 @@ internal class CConfigIni : INotifyPropertyChanged {
 		this.BoxFontName = CFontRenderer.DefaultFontName;
 		this.ApplyLoudnessMetadata = true;
 		this.bEnableCountdownTimer = true;
-		this.sLang = "ja";
+		this.sLang = "en";
 		this.nLayoutType = 1;
 
 		// 2018-08-28 twopointzero:
@@ -1769,20 +1769,14 @@ internal class CConfigIni : INotifyPropertyChanged {
 					continue;
 				}
 				for (int k = 0; k < 0x10; k++) {
-					if (this.KeyAssign[i][j][k].InputDevice != deviceType ||
-						this.KeyAssign[i][j][k].ID != nID ||
-						this.KeyAssign[i][j][k].Code != nCode) {
-						continue;
+					if (this.KeyAssign[i][j][k].InputDevice == deviceType
+						&& this.KeyAssign[i][j][k].ID == nID
+						&& this.KeyAssign[i][j][k].Code == nCode
+						) {
+						this.KeyAssign[i][j][k].InputDevice = EInputDevice.Unknown;
+						this.KeyAssign[i][j][k].ID = 0;
+						this.KeyAssign[i][j][k].Code = 0;
 					}
-
-					for (int m = k; m < 15; m++) {
-						this.KeyAssign[i][j][m] = this.KeyAssign[i][j][m + 1];
-					}
-
-					this.KeyAssign[i][j][15].InputDevice = EInputDevice.Unknown;
-					this.KeyAssign[i][j][15].ID = 0;
-					this.KeyAssign[i][j][15].Code = 0;
-					k--;
 				}
 			}
 		}
@@ -2287,6 +2281,9 @@ internal class CConfigIni : INotifyPropertyChanged {
 		sw.WriteLine();
 		sw.WriteLine("; デフォルトで選択される難易度");
 		sw.WriteLine("DefaultCourse={0}", this.nDefaultCourse);
+		sw.WriteLine();
+		sw.WriteLine("; 譜面分岐のガイド表示(0:OFF, 1:ON)");
+		sw.WriteLine("BranchGuide={0}", this.bBranchGuide ? 1 : 0);
 		sw.WriteLine();
 		sw.WriteLine("; スコア計算方法(0:旧配点, 1:旧筐体配点, 2:新配点)");
 		sw.WriteLine("ScoreMode={0}", this.nScoreMode);

@@ -1,5 +1,81 @@
 # Changelog
 
+## [0.6.0.92] - 2025-10-20 (Beta)
+
+- [HotFix] Fix gauge not decreasing correctly on miss due to the previous version
+
+## [0.6.0.91] - 2025-10-20 (Beta)
+
+- [HotFix] Fix non-branched charts had no gauge increment nor damage due to the previous version
+
+## [0.6.0.90] - 2025-10-19 (Beta)
+
+- [BugFix] - Fixed incorrect gauge increment or damage for notes near branching points
+- [BugFix] - Fixed gauge damage rate typo in branched charts causing wrong GOOD rate
+- [BugFix] - Fixed missing roll head processing for Bongo roll heads (I & H)
+- [BugFix] - Fixed missing or broken branch transition animations
+- [BugFix] - Fixed wrong color when branching to Normal with transparent background
+- [BugFix] - Fixed branch text not fading out and inconsistent positioning
+- [Enhancement] - Refined branch text animation with easing and resolution scaling
+- [BugFix] - Fixed wrong starting branch after branched charts in Dan-i or training mode
+- [BugFix] - Fixed missing initial branching animation for non-Normal HIDDENBRANCH charts
+- [BugFix] - Fixed branch text not displaying if #LEVELHOLD appears before first branch
+- [Feat] - Added branch text scroll animation into note lane
+- [Feat] - Unhid branch after training mode branch switch for HIDDENBRANCH charts
+- [Feat] - Ported and refined TJAP3(tpz)’s branch guide for non-autoplay P1
+- [BugFix] - Fixed incorrect CalcType.Quintic EaseInOut() easing calculation
+- [Feat] - Treated empty or unrecognized #BRANCHSTART as “keep current branch” for parsing safety
+- [BugFix] - Made branch requirement judgment consistent with TaikoJiro
+- [BugFix] - Fixed and refined branch judge point behavior and timing
+- [BugFix] - Fixed unended rolls caused by branched roll head + non-branched roll end
+- [BugFix] - Fixed incorrect branch change point timing and barline behavior
+- [BugFix] - Fixed all branches’ notes displaying before first branch
+- [Feat] - Made #BARLINE display per-branch
+- [BugFix] - Fixed wrong character animation speed and scroll position between branch points
+- [BugFix] - Replaced in-branch visibility check with CChip.bVisible
+- [BugFix] - Fixed #LEVELHOLD applying to all branches instead of only its own
+- [BugFix] - Improved TJA branch parsing correctness and missing definitions handling
+- [Enhancement] - Ensured consistent BPM, time signatures, and branch alignment
+- [Feat] - Handled branch changes by note definition order (Daijiro 2/3 behavior)
+- [Feat] - Made several commands (#BARLINEOFF/ON, #GOGOSTART/END, #NM/BM/HBSCROLL, #DIRECTION) work per-branch
+- [BugFix] - Fixed roll display and judgment across branches for re/disappearing rolls
+
+## [0.6.0.89] - 2025-08-28 (Beta)
+
+- [i18n] Update Spanish and Chinese texts
+
+## [0.6.0.88] - 2025-08-12 (Beta)
+
+- [i18n] Add Ch V & VI Nameplates & Unlockables Russian & Chinese Text
+
+## [0.6.0.87] - 2025-08-09 (Beta)
+
+- [Fix] note lane became transparent in training mode for charts with BGA/MOVIE (not played in training mode)
+- [Fix] #BARLINE ignored scroll mode
+- [Fix] fuze rolls were counted into bar roll length (beyond balloon hit count) for scoring and Dan-i exam monitoring
+- [Fix] dan-i monitoring for AdLib, Mine, & Fuze roll notes was broken because these notes were not counted in TJA parsing due to wrong note type checking conditions
+- [Fix] timing window of fuze roll was the same as bar rolls and not expectedly the same as regular balloons
+- [Fix] music played too early when users retry after music plays and then pause + resume before music plays (although was able to resync when the music should play)
+- [Fix] AI battle mode failed to use 2P layout due to the fix of 0.6.0.79
+- [Fix] setting duplicated key binds for the same key overrode the next key bind under cursor by stopping shifting out removed key binds
+- [Fix] hitting AdLibs at combo milestone retriggered combo milestone effects
+- [Fix] players' animation failed to exit max-soul state after retrying
+- [Fix] balloon/Kusu chara/puchi animation for charts with dense balloon-type notes, follow-up of 0.6.0.55
+- [Fix] player chara & puchi animation ignored play speed
+- [Fix] go-go judgemark fire, activated balloon, and number bubble for balloon and fuze rolls ignored JPosScroll
+
+## [0.6.0.86] - 2025-08-07 (Beta)
+
+- [Fix] Fix Rainbow gauges flickering
+
+## [0.6.0.85] - 2025-08-02 (Beta)
+
+- [Fix] Fix a crash that occurs when clearing a Dan that has a title less than 2 chars in length
+
+## [0.6.0.84] - 2025-07-28 (Beta)
+
+- [Feat] Implemented native OpenGL rendering for MacOS
+
 ## [0.6.0.83] - 2025-07-02 (Beta)
 
 - Unlockables and nameplates update
