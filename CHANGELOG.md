@@ -3,22 +3,32 @@
 ## [0.7.0.4] - 2026-11-04 (Beta)
 
 - [Enhancement] Various minor additions reducing lag spikes
+- [Enhancement] Various minor additions reducing lag spikes
 
 ## [0.7.0.3] - 2026-11-03 (Beta)
 
 - [Feat] Add a Chart Videos tab in My Room's TV
+- [Feat] Add a Chart Videos tab in My Room's TV
 
 ## [0.7.0.2] - 2026-11-01 (Beta)
 
+- [Fix] Characters and Puchis didn't provide custom unlock texts and hidden indexes on their API
 - [Fix] Characters and Puchis didn't provide custom unlock texts and hidden indexes on their API
 
 ## [0.7.0.1] - 2026-11-01 (Beta)
 
 - [Fix] Ignore skins older than 0.7.0.0 to prevent missing _boot obscure issues
 - [Fix] Autobuild script did exclude recursively folders with Songs excluding actually important stages folders
+- [Fix] Ignore skins older than 0.7.0.0 to prevent missing _boot obscure issues
+- [Fix] Autobuild script did exclude recursively folders with Songs excluding actually important stages folders
 
 ## [0.7.0.0] - 2026-11-01 (Beta)
 
+---------
+Co-authored-by: Wei-Cheng Yeh (IID) <iid@ccns.ncku.edu.tw>
+Co-authored-by: Jack <jack9966qk@gmail.com>
+Co-authored-by: Brandon <shrandonm@users.noreply.github.com>
+Co-authored-by: DashyDesu <83197762+DashyDesu@users.noreply.github.com>
 (Note that 0.6.0 skins are no longer supported from this version)
 
 ### Major changes
@@ -63,9 +73,11 @@
 ## [0.6.0.112] - 2026-10-30 (Beta)
 
 - [Fix] Network pinging can crash due to Math.Abs() negated long.MinValue when checking the timestamp
+- [Fix] Network pinging can crash due to Math.Abs() negated long.MinValue when checking the timestamp
 
 ## [0.6.0.111] - 2026-09-12 (Beta)
 
+- [Fix] Graphics Device and inputs not being properly initialized when used with OpenTaiko Hub 0.2 or newer
 - [Fix] Graphics Device and inputs not being properly initialized when used with OpenTaiko Hub 0.2 or newer
 
 ## [0.6.0.110] - 2026-09-05 (Beta)
