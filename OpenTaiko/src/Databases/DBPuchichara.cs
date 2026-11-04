@@ -11,11 +11,10 @@ class DBPuchichara {
 			SplitLane = false;
 		}
 
-		public float GetCoinMultiplier() {
-			float mult = 1f;
-			if (Autoroll > 0) mult *= 0f;
-			if (ShowAdlib == true) mult *= 0.9f;
-			return mult;
+		public float GetCoinMultiplier(float multRarity, bool allPurpleEnabled = true, bool autorollEnabled = true, bool showAdlibEnabled = true, bool splitLaneEnabled = true) {
+			if (autorollEnabled && Autoroll > 0) multRarity *= 0f;
+			if (showAdlibEnabled && ShowAdlib == true) multRarity *= 0.9f;
+			return multRarity;
 		}
 
 		[JsonProperty("allpurple")]
@@ -78,7 +77,7 @@ class DBPuchichara {
 		// String or CLocalizationData
 		[JsonProperty("description")]
 		[JsonConverter(typeof(LocalizedStringConverter<CLocalizationData>))]
-		public object Description;
+		public object? Description;
 	}
 
 }

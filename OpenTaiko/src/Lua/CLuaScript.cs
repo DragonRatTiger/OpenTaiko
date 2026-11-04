@@ -1,13 +1,55 @@
 ﻿using System.Diagnostics;
-using System.Drawing;
+using System.Globalization;
 using System.Text;
-using System.Text.Json.Nodes;
 using FDK;
 using NLua;
 
 namespace OpenTaiko;
 
-class CLuaScript : IDisposable {
+public record struct NamedLuaFunction(string Name, LuaFunction? Func = null) : IDisposable {
+	public void Load(Lua? lua) => Func = lua?[Name] as LuaFunction;
+	public void LoadNoop(Lua? lua) => Func = lua?.DoString("return function(...) end")?[0] as LuaFunction;
+	public void Dispose() {
+		Func?.Dispose();
+		Func = null;
+	}
+}
+
+public abstract class CLuaScript : IDisposable {
+
+	#region [For the new Lua module methods]
+
+	public HashSet<LuaTexture> TextureList = [];
+	public HashSet<LuaTexture> CanvasList = []; // LuaCanvas tracked internally as LuaTexture
+	public HashSet<Lua3DScene> Scene3DList = [];
+	public HashSet<LuaSound> SoundList = [];
+	public HashSet<LuaVideo> VideoList = [];
+	public HashSet<LuaAviUtl2Project> AviUtl2List = [];
+	public HashSet<LuaText> TextList = [];
+	public HashSet<LuaGlyphText> GlyphTextList = [];
+	public HashSet<LuaGradientMap> GradientList = [];
+	//public Dictionary<string, LuaSharedResource<LuaTexture>> SharedTextures = new();
+	//public Dictionary<string, LuaSharedResource<LuaSound>> SharedSounds = new();
+
+	private static bool CheckPlayerOrError(int player) {
+		if (player < 0 || player >= OpenTaiko.MAX_PLAYERS) {
+			LogNotification.PopError($"Invalid player index in lua module, expected [0,{OpenTaiko.MAX_PLAYERS - 1}]");
+			return false;
+		}
+		return true;
+	}
+
+	internal LuaROSaveFile? GetLuaROSaveFile(int player)
+		=> !CheckPlayerOrError(player) ? null : new LuaROSaveFile(OpenTaiko.SaveFileInstances[player], player);
+	internal LuaSaveFile? GetLuaSaveFile(int player)
+		=> !CheckPlayerOrError(player) ? null : new LuaSaveFile(OpenTaiko.SaveFileInstances[player], player);
+
+	internal LuaSongList RequestSongList(LuaSongListSettings lsls) {
+		return new LuaSongList(lsls);
+	}
+
+	#endregion
+
 	public static List<CLuaScript> listScripts { get; private set; } = new List<CLuaScript>();
 	public static void tReloadLanguage(string lang) {
 		foreach (var item in listScripts) {
@@ -18,6 +60,8 @@ class CLuaScript : IDisposable {
 
 
 	public string strDir { get; private set; }
+	public string strScriptPath { get; private set; }
+	public string strScriptShort { get; private set; }
 	public string strTexturesDir { get; private set; }
 	public string strSounsdDir { get; private set; }
 
@@ -25,15 +69,33 @@ class CLuaScript : IDisposable {
 	public bool bDisposed { get; private set; }
 	public bool bCrashed { get; protected set; }
 
+	// false for read-only modules (ROActivities and backgrounds)
+	public bool IsWritable { get; }
+
+	// the script whose Lua code runs now
+	[ThreadStatic] private static CLuaScript? _running;
+
+	internal static void BlockWrite(string member) =>
+		LogNotification.PopError($"[ROActivity] '{member}' is a write operation and is not allowed in a read-only module.");
+
+	/// <summary>True, after logging the read-only error, when the Lua code running now belongs to a read-only module.
+	/// For calls on objects that are not per-script globals, such as song nodes.</summary>
+	internal static bool BlockedInReadOnly(string member) {
+		if (_running == null || _running.IsWritable) return false;
+		BlockWrite(member);
+		return true;
+	}
+
 	protected Lua LuaScript { get; private set; }
 
-	private LuaFunction lfLoadAssets;
-	private LuaFunction lfReloadLanguage;
+	private NamedLuaFunction lfBindload = new("__otk_bindload");
+	private NamedLuaFunction lfLoadAssets = new("loadAssets");
+	private NamedLuaFunction lfReloadLanguage = new("reloadLanguage");
 
-	private CLuaInfo luaInfo;
+	private CLuaInfo? luaInfo;
 	private CLuaFps luaFPS = new CLuaFps();
 
-	public List<IDisposable> listDisposables { get; private set; } = new List<IDisposable>();
+	public List<IDisposable?> listDisposables { get; private set; } = new List<IDisposable?>();
 
 	protected bool Available {
 		get {
@@ -41,167 +103,416 @@ class CLuaScript : IDisposable {
 		}
 	}
 
-	private double getNum(JsonValue x) {
-		return (double)x;
-	}
+	private readonly HashSet<string> _reportedFunctions = new();
 
-	private string getText(JsonValue x) {
-		return (string)x;
-	}
+	// functions that raised an error are not called again, so a failing update or draw does not throw every frame.
+	// A function called with a string first (an animation or voice name) is skipped for that string only, up to
+	// MaxFailedNames strings; null = every call is skipped
+	private readonly Dictionary<string, HashSet<string>?> _failedCalls = new();
+	private const int MaxFailedNames = 16;
 
-	private List<double> getNumArray(JsonArray x) {
-		List<double> array = new List<double>();
+	private bool IsFailedCall(string name, string? firstArg)
+		=> _failedCalls.TryGetValue(name, out var names) && (names == null || (firstArg != null && names.Contains(firstArg)));
 
-		foreach (double value in x) {
-			array.Add(value);
+	private void RememberFailedCall(string name, string? firstArg) {
+		if (firstArg == null) {
+			_failedCalls[name] = null;
+			return;
 		}
-		return array;
+		if (!_failedCalls.TryGetValue(name, out var names))
+			_failedCalls[name] = names = new();
+		if (names == null) return;
+		names.Add(firstArg);
+		if (names.Count > MaxFailedNames) _failedCalls[name] = null;
 	}
 
-	private List<string> getTextArray(JsonArray x) {
-		List<string> array = new List<string>();
-
-		foreach (string value in x) {
-			array.Add(value);
-		}
-		return array;
-	}
-
-	protected object[] RunLuaCode(LuaFunction luaFunction, params object[] args) {
+	protected object[]? RunLuaCode(NamedLuaFunction luaFunction, params object?[] args) {
+		var outer = _running;
+		string? firstArg = args is { Length: > 0 } ? args[0] as string : null;
 		try {
-			if (luaFunction == null) return null;
-			var ret = luaFunction.Call(args);
-			LuaScript.State.GarbageCollector(KeraLua.LuaGC.Collect, 0);
-			return ret;
+			if (luaFunction.Func == null) {
+				// To prevent lag
+				return null;
+			}
+			if (_failedCalls.Count > 0 && IsFailedCall(luaFunction.Name, firstArg))
+				return null;
+			_running = this;
+			// Lua's own incremental collector runs as the script allocates and keeps the heap within about twice
+			// its live data (Lua's default pause of 200)
+#if DEBUG
+			long profStart = CFrameProfiler.ExtraBegin();
+			long profAlloc = CFrameProfiler.AllocNow();
+			try {
+				return luaFunction.Func.Call(args);
+			} finally {
+				if (profStart != 0) CFrameProfiler.ExtraEnd(this.ProfSlot(luaFunction.Name), profStart, profAlloc);
+			}
+#else
+			return luaFunction.Func.Call(args);
+#endif
 		} catch (Exception exception) {
-			Crash(exception);
+			RememberFailedCall(luaFunction.Name, firstArg);
+			// only a function's first error is shown: a failing update or draw would add an error card and a log entry every frame
+			if (_reportedFunctions.Add(luaFunction.Name)) {
+				Crash(exception, $"RunLuaCode - {luaFunction.Name}({DescribeArgs(args)})");
+			} else {
+				bCrashed = true;
+			}
+		} finally {
+			_running = outer;
 		}
-		return new object[0];
+		return null;
 	}
 
-	private JsonNode LoadConfig(string name) {
-		using Stream stream = File.OpenRead($"{strDir}/{name}");
-		JsonNode jsonNode = JsonNode.Parse(stream);
-		return jsonNode;
+#if DEBUG
+	// the profiler's slot of a function of this script, named after the script's last folders
+	private readonly Dictionary<string, int> _profSlots = new();
+	private int ProfSlot(string function) {
+		if (_profSlots.TryGetValue(function, out int slot)) return slot;
+		var parts = (strDir ?? "").TrimEnd('/', '\\').Split('/', '\\');
+		string label = string.Join("/", parts.Skip(Math.Max(0, parts.Length - 3)));
+		return _profSlots[function] = CFrameProfiler.Register($"lua:{label}/{function}");
+	}
+#endif
+
+	// the arguments of a failed call for its error card: short values as they are, objects by type name
+	private static string DescribeArgs(object?[]? args) => args == null ? "" : string.Join(", ", args.Select(DescribeArg));
+
+	private static string DescribeArg(object? v) {
+		if (v == null) return "null";
+		if (v is string s) return s.Length <= 64 ? $"\"{s}\"" : $"\"{s[..64]}...\"";
+		if (v is bool b) return b ? "true" : "false";
+		if (v.GetType().IsPrimitive) return Convert.ToString(v, CultureInfo.InvariantCulture) ?? "";
+		return v.GetType().Name;
 	}
 
-	private CTexture LoadTexture(string name) {
-		CTexture texture = new CTexture($"{strTexturesDir}/{name}", false);
+	// fill a reused argument array, keeping a slot's box while its value is unchanged
+	internal static void SetArg(object?[] args, int i, float v) {
+		if (args[i] is not float old || BitConverter.SingleToInt32Bits(old) != BitConverter.SingleToInt32Bits(v)) args[i] = v;
+	}
+	internal static void SetArg(object?[] args, int i, float? v) {
+		if (v is float f) SetArg(args, i, f);
+		else args[i] = null;
+	}
+	internal static void SetArg(object?[] args, int i, double v) {
+		if (args[i] is not double old || BitConverter.DoubleToInt64Bits(old) != BitConverter.DoubleToInt64Bits(v)) args[i] = v;
+	}
+	internal static void SetArg(object?[] args, int i, int v) {
+		if (args[i] is not int old || old != v) args[i] = v;
+	}
+	internal static void SetArg(object?[] args, int i, long v) {
+		if (args[i] is not long old || old != v) args[i] = v;
+	}
+	internal static void SetArg(object?[] args, int i, bool v) => args[i] = v ? BoxedTrue : BoxedFalse;
+	private static readonly object BoxedTrue = true;
+	private static readonly object BoxedFalse = false;
 
-		listDisposables.Add(texture);
-		return texture;
+	// Run a hook (onStart / activate) as an engine-owned Lua coroutine: a count hook on the thread fires often +
+	// cheaply, but only YIELDS once the current resume has run past YieldBudgetMs of wall-clock. So a long load
+	// spreads across frames by TIME — not by VM-instruction count, which barely advances during C#-bound scene/
+	// texture building (each scene:Obj…/RegisterTexture is ~1 Lua instruction but expensive), the reason a build
+	// loop used to run start-to-finish in one resume and freeze the frame. Lua is render-thread-only so it can't
+	// move off-thread — but it can yield. Resuming the thread directly (not via NLua's coroutine.resume under a
+	// lua_pcall) is what lets the hook's yield propagate back to us.
+	public static int YieldCheckInstructions = 2000;    // VM instructions between wall-clock checks (fire often, cheap)
+	public static double YieldBudgetMs = 8.0;           // a resume keeps running until this much wall-time elapses
+	private static long _resumeStartTs;                 // Stopwatch ts when the current resume began (render-thread only)
+
+	// The skinner LOADING API + the wrapper that runs onStart/activate so queued blocks load + yield around it.
+	// LOADING:Add(label?, weight?, fn) records a block; LOADING:Tick(sub) yields a frame inside a heavy loop.
+	// All yielding is Lua-side (coroutine.yield) — never from a C# frame (that would cross a C-call boundary).
+	private const string LoadingApiLua = """
+do
+	-- defined in bounded local variables
+	local _private = { _queue = {}, _base = 0, _w = 0, _total = 1 }
+	local _loading = {}
+	function _loading:Add(a, b, c)
+	  local label, weight, fn
+	  if type(a) == 'function' then fn = a
+	  elseif type(b) == 'function' then label = a; fn = b
+	  else label = a; weight = b; fn = c end
+	  _private._queue[#_private._queue + 1] = { label = label, weight = weight or 1, fn = fn }
+	end
+	function _loading:Tick(sub)
+	  sub = tonumber(sub) or 0
+	  if sub < 0 then sub = 0 elseif sub > 1 then sub = 1 end
+	  coroutine.yield((_private._base + sub * _private._w) / _private._total)
+	end
+
+	function _private.__begin()
+	  _private._queue = {}; _private._base = 0; _private._w = 0; _private._total = 1
+	end
+	function _private.__run()
+	  local q = _private._queue
+	  local total = 0
+	  for i = 1, #q do total = total + (q[i].weight or 1) end
+	  if total <= 0 then total = 1 end
+	  _private._total = total
+	  local done = 0
+	  for i = 1, #q do
+		local item = q[i]
+		_private._base = done; _private._w = item.weight or 1
+		if type(item.fn) == 'function' then item.fn() end
+		done = done + (item.weight or 1)
+		coroutine.yield(done / total)
+	  end
+	  _private._queue = {}
+	end
+
+	function __otk_bindload(func)
+	  return function()
+		_private.__begin()
+		local f = func
+		if type(f) == 'function' then f() end
+		_private.__run()
+	  end
+	end
+
+	-- export the API table
+	_G.LOADING = _loading
+end
+""";
+
+	// Static so the native callback isn't GC-collected. The count-event yield defers to hook-return (no longjmp
+	// through this managed frame); the IsYieldable guard avoids "yield across a C-call boundary"; exceptions are
+	// swallowed so none crosses back into native Lua.
+	private static readonly KeraLua.LuaHookFunction _yieldHook = YieldHook;
+
+	[MonoPInvokeCallback(typeof(KeraLua.LuaHookFunction))]
+	private static void YieldHook(IntPtr L, IntPtr ar) {
+		try {
+			if (Stopwatch.GetElapsedTime(_resumeStartTs).TotalMilliseconds < YieldBudgetMs) return;   // under budget — keep running
+			var st = KeraLua.Lua.FromIntPtr(L);
+			if (st != null && st.IsYieldable) st.Yield(0);
+		} catch { /* never let a managed exception cross back into native Lua */ }
+	}
+
+	// The coroutine thread we own + drive for the current hook (onStart). One at a time per script instance.
+	private KeraLua.Lua? _hookCo;
+	private LuaThread? _hookThread = null;
+	private bool _hookCollect;
+
+	/// <summary>Begin running a hook function (e.g. onStart) as a coroutine on a dedicated, engine-owned Lua
+	/// thread. Call tStepYieldable() repeatedly until it returns false. With <paramref name="collectWhenDone"/>
+	/// the script's heap gets one full collection when the hook ends.</summary>
+	protected void tBeginYieldable(NamedLuaFunction luaFunction, bool collectWhenDone = true) {
+		tEndYieldable();
+		_hookCollect = collectWhenDone;
+		var L = LuaScript?.State;
+		if (LuaScript == null || L == null || luaFunction.Func == null)
+			return;   // undefined hook ⇒ no-op (treated as done)
+		try {
+			var L2 = LuaScript.NewThread(out var thread2);       // new thread pushed on L's stack + wrapper
+			_hookThread = thread2;                               // anchor it (pops it off L) so Lua won't GC it
+			// Wrap the target in the LOADING runner: __otk_bindload(func) → fn that runs _private.__begin();
+			// func(); _private.__run(), so any LOADING:Add blocks load + yield around it.
+			if (lfBindload.Func != null) {
+				LuaFunction? func;
+				try {
+					func = lfBindload.Func.Call(luaFunction.Func)[0] as LuaFunction;
+				} catch (Exception ex) {
+					Trace.TraceError($"{strScriptShort} loader wrap failed: {ex.ToString()}");
+					tEndYieldable();
+					return;
+				}
+				LuaScript.XMove(thread2, func);                  // wrapped closure onto co's stack
+			} else {                                             // helper missing — run the function directly
+				if (luaFunction.Func == null) {
+					tEndYieldable();
+					return;
+				}
+				LuaScript.XMove(thread2, luaFunction.Func);
+			}
+			L2.SetHook(_yieldHook, KeraLua.LuaHookMask.Count, Math.Max(1, YieldCheckInstructions));
+			_hookCo = L2;
+		} catch (Exception exception) {
+			Crash(exception, $"tBeginYieldable({luaFunction.Name})");
+			tEndYieldable();
+		}
+	}
+
+	/// <summary>Resume the hook coroutine one chunk (to the next auto-yield / explicit coroutine.yield, or
+	/// completion). Returns true while still running; sets <paramref name="progress"/> (0..1) to the last value
+	/// passed to coroutine.yield (0 for an auto-yield).</summary>
+	protected bool tStepYieldable(out float progress) {
+		progress = 0f;
+		var co = _hookCo;
+		if (co == null) return false;
+		var outer = _running;
+		try {
+			_resumeStartTs = Stopwatch.GetTimestamp();   // YieldHook yields once this resume runs past YieldBudgetMs
+			KeraLua.LuaStatus status;
+			int nresults;
+			_running = this;
+			try {
+				status = co.Resume(LuaScript.State, 0, out nresults);
+			} finally {
+				_running = outer;
+			}
+			if (status == KeraLua.LuaStatus.Yield) {
+				if (nresults > 0) {
+					try { progress = (float)co.ToNumber(-nresults); } catch { /* keep 0 */ }
+					co.Pop(nresults);   // drop the yielded values so the next Resume passes nothing back
+				}
+				return true;
+			}
+			if (status != KeraLua.LuaStatus.OK) {   // runtime/other error in the hook
+				bCrashed = true;
+				Trace.TraceError($"{this.strScriptShort} hook error: {co.ToString(-1)}");
+			}
+			tEndYieldable();
+			if (_hookCollect) CollectLoadGarbage();
+			return false;
+		} catch (Exception exception) {
+			Crash(exception, $"tStepYieldable({progress})");
+			tEndYieldable();
+			return false;
+		}
+	}
+
+	// Lua's collector runs only when the script allocates, so a script that sits idle after loading would keep
+	// its loading garbage: one full collection when the script chunk (+ loadAssets) ends and when onStart ends
+	private void CollectLoadGarbage() {
+		try { LuaScript?.State?.GarbageCollector(KeraLua.LuaGC.Collect, 0); } catch { /* the state is gone */ }
+	}
+
+	private void tEndYieldable() {
+		try { _hookThread?.Reset(); } catch { /* ignore */ }
+		_hookThread = null;
+		_hookCo = null;
 	}
 
 	private void DebugLog(string message) {
 		Trace.TraceInformation("<Lua Log>: " + message);
 	}
 
-	private CSound LoadSound(string name, string soundGroupName) {
-		ESoundGroup soundGroup;
-		switch (soundGroupName) {
-			case "soundeffect":
-				soundGroup = ESoundGroup.SoundEffect;
-				break;
-			case "voice":
-				soundGroup = ESoundGroup.Voice;
-				break;
-			case "songpreview":
-				soundGroup = ESoundGroup.SongPreview;
-				break;
-			case "songplayback":
-				soundGroup = ESoundGroup.SongPlayback;
-				break;
-			default:
-				soundGroup = ESoundGroup.Unknown;
-				break;
-		}
-		CSound sound = OpenTaiko.SoundManager?.tCreateSound($"{strSounsdDir}/{name}", soundGroup);
+	public bool IsAvailable { get; private set; }
 
-		listDisposables.Add(sound);
-		return sound;
-	}
+	// true for transitions, whose sounds are never held back
+	protected virtual bool BgmPlaysDuringReveal => false;
 
-	private CCachedFontRenderer LoadFontRenderer(int size, string fontStyleName) {
-		CFontRenderer.FontStyle fontStyle;
-		switch (fontStyleName) {
-			case "regular":
-				fontStyle = CFontRenderer.FontStyle.Regular;
-				break;
-			case "bold":
-				fontStyle = CFontRenderer.FontStyle.Bold;
-				break;
-			case "italic":
-				fontStyle = CFontRenderer.FontStyle.Italic;
-				break;
-			case "underline":
-				fontStyle = CFontRenderer.FontStyle.Underline;
-				break;
-			case "strikeout":
-				fontStyle = CFontRenderer.FontStyle.Strikeout;
-				break;
-			default:
-				fontStyle = CFontRenderer.FontStyle.Regular;
-				break;
-		}
-		CCachedFontRenderer fontRenderer = HPrivateFastFont.tInstantiateMainFont(size, fontStyle);
-
-		listDisposables.Add(fontRenderer);
-		return fontRenderer;
-	}
-
-	private string GetLocalizedString(string key, params object?[] args) {
-		return CLangManager.LangInstance.GetString(key, args);
-	}
-
-	private TitleTextureKey CreateTitleTextureKey(string title, CCachedFontRenderer fontRenderer, int maxSize, Color? color = null, Color? edgeColor = null) {
-		return new TitleTextureKey(title, fontRenderer, color ?? Color.White, edgeColor ?? Color.Black, maxSize);
-	}
-
-	private CTexture GetTextTex(TitleTextureKey titleTextureKey, bool vertical, bool keepCenter) {
-		return TitleTextureKey.ResolveTitleTexture(titleTextureKey, vertical, keepCenter);
-	}
-
-	public CLuaScript(string dir, string? texturesDir = null, string? soundsDir = null, bool loadAssets = true) {
+	public CLuaScript(string dir, string? texturesDir = null, string? soundsDir = null, bool loadAssets = true, string fallbackScript = "", bool writable = true) {
 		strDir = dir;
+		strScriptPath = Path.Join(strDir, "Script.lua");
+		strScriptShort = Path.Join(Path.GetFileName(Path.GetDirectoryName(this.strScriptPath)), Path.GetFileName(this.strScriptPath));
 		strTexturesDir = texturesDir ?? $"{dir}/Textures";
 		strSounsdDir = soundsDir ?? $"{dir}/Sounds";
 
+		IsAvailable = true;
+		IsWritable = writable;
 
 		LuaScript = new Lua();
-		LuaScript.LoadCLRPackage();
 		LuaScript.State.Encoding = Encoding.UTF8;
-		LuaSecurity.Secure(LuaScript);
+		bool fromGlobal = CSkin.IsGlobalModuleFolder(dir);
+		LuaSecurity.Secure(LuaScript, dir, fromGlobal);
 
 		try {
-			LuaScript.DoFile($"{strDir}/Script.lua");
-
 			LuaScript["info"] = luaInfo = new CLuaInfo(strDir);
 			LuaScript["fps"] = luaFPS;
 
+			LuaScript["debugLog"] = (Delegate)DebugLog;
 
-			lfLoadAssets = (LuaFunction)LuaScript["loadAssets"];
-			lfReloadLanguage = (LuaFunction)LuaScript["reloadLanguage"];
+			// New Lua Module API
+			var ltf = new LuaTextureFunc(TextureList, dir);
+			var lsf = new LuaSoundFunc(SoundList, dir) { HoldExempt = BgmPlaysDuringReveal };
 
-			LuaScript["loadConfig"] = LoadConfig;
-			LuaScript["loadTexture"] = LoadTexture;
-			LuaScript["loadSound"] = LoadSound;
-			LuaScript["loadFontRenderer"] = LoadFontRenderer;
-			LuaScript["createTitleTextureKey"] = CreateTitleTextureKey;
-			LuaScript["getTextTex"] = GetTextTex;
-			LuaScript["getNum"] = getNum;
-			LuaScript["getText"] = getText;
-			LuaScript["getNumArray"] = getNumArray;
-			LuaScript["getTextArray"] = getTextArray;
-			LuaScript["getLocalizedString"] = GetLocalizedString;
-			LuaScript["displayDanPlate"] = CActSelect段位リスト.tDisplayDanPlate;
-			LuaScript["debugLog"] = DebugLog;
+			LuaScript["TEXTURE"] = ltf;
+			LuaScript["CANVAS"] = new LuaCanvasFunc(CanvasList);
+			LuaScript["GRAPHICS"] = new LuaGraphicsFunc();   // true scissor clip for scrolling UI panels
+			LuaScript["SCENE3D"] = new Lua3DSceneFunc(Scene3DList);
+			LuaScript["PHYSICS"] = new LuaPhysicsFunc();
+			LuaScript["GLOBALCAMERA"] = new LuaGlobalCamera();
+			LuaScript["NET"] = new LuaNetworking();   // P2P online core (OpenTaiko Online protocol)
+			LuaScript["COLLIDERS"] = new LuaCollidersFunc();   // general collider shapes (raycast / overlap)
+			LuaScript["PATHFIND"] = new LuaPathfindFunc();     // weighted nav graph + A*
+			LuaScript["MODEL"] = new LuaModelFunc(dir);
+			LuaScript["SOUND"] = lsf;
+			LuaScript["VIDEO"] = new LuaVideoFunc(VideoList, dir);
+			LuaScript["AVIUTL2"] = new LuaAviUtl2Func(AviUtl2List, dir);   // AviUtl2 projects (.aup2), played like a video
+			LuaScript["TEXT"] = new LuaTextFunc(TextList, GlyphTextList, dir);
+			LuaScript["JSONLOADER"] = new LuaJsonLoaderFunc(dir);
+			LuaScript["INILOADER"] = new LuaIniLoaderFunc(dir);
+			LuaScript["INPUT"] = new LuaInputFunc();
+			LuaScript["REPLAY"] = new LuaReplayFunc();   // list a chart's replays + start watching one
+			LuaScript["SIZE"] = new LuaSizeFunc();
+			LuaScript["VECTOR2"] = new LuaVector2Func();
+			LuaScript["VECTOR3"] = new LuaVector3Func();
+			LuaScript["VECTOR4"] = new LuaVector4Func();
+			LuaScript["VECTOR"] = new LuaVectorFunc();
+			LuaScript["MATRIX2"] = new LuaMatrix2Func();
+			LuaScript["MATRIX3"] = new LuaMatrix3Func();
+			LuaScript["MATRIX4"] = new LuaMatrix4Func();
+			LuaScript["MATRIX"] = new LuaMatrixFunc();
+			LuaScript["QUATERNION"] = new LuaQuaternionFunc();
+			LuaScript["COLOR"] = new LuaColorFunc();
+			LuaScript["COUNTER"] = new LuaCounterFunc();
+			LuaScript["NAMEPLATE"] = new LuaNameplateFunc();
+			LuaScript["NAMEPLATESLIST"] = new LuaNameplatesDatabase();
+			if (writable)
+				LuaScript["CONFIG"] = new LuaConfigIniFunc();
+			else
+				LuaScript["CONFIG"] = new LuaROConfigIniFunc();
+			LuaScript["SONGMOUNT"] = new LuaSongMountFunc(dir);   // read the song the host just confirmed (for online sync)
+			LuaScript["THEME"] = new LuaThemeFunc(writable);
+			LuaScript["SHARED"] = new LuaSharedResourceFunc(OpenTaiko.GlobalStores.SharedTextures, OpenTaiko.GlobalStores.SharedSounds, OpenTaiko.GlobalStores.SharedStrings, OpenTaiko.GlobalStores.SharedScenes, ltf, lsf, dir);
+			if (writable)
+				LuaScript["DATABASE"] = new LuaDataStorageFunc(dir);
+			else
+				LuaScript["DATABASE"] = new LuaRODataStorageFunc(dir);
+			LuaScript["HEIGHTMAP"] = new LuaHeightmapFunc(dir);
+			LuaScript["CHARACTER"] = new LuaCharacterFunc();
+			LuaScript["PUCHICHARALIST"] = OpenTaiko.Tx?.LuaPuchicharaDb;
+			LuaScript["CHARACTERLIST"] = OpenTaiko.Tx?.LuaCharacterDb;
+			LuaScript["STORAGE"] = new LuaStorageFunc(dir, writable);
+			LuaScript["PLAYSTATE"] = new LuaPlayStateFunc();
+			LuaScript["SQL"] = new LuaSQLFunc(dir, writable);
+			LuaScript["LANG"] = new LuaLangFunc();
+			// read-only scripts (ROActivities, backgrounds) get no ACTIVITY (use ROACTIVITY) and their write calls do nothing
+			LuaScript["ACTIVITY"] = writable ? new LuaActivityFunc(fromGlobal) : null;
+			LuaScript["ROACTIVITY"] = new LuaROActivityFunc(fromGlobal);
+			LuaScript["STAGES"] = new LuaStagesFunc(LuaScript, fromGlobal, this as CLuaStageScript);   // stage namespaces
+			LuaScript["MODICONS"] = new LuaModIconsFunc();
+			LuaScript["HITSOUNDSLIST"] = new LuaHitsoundsDatabase();
+			LuaScript["VIRTUALSLOTS"] = new LuaVirtualSlotManager(writable);
+			LuaScript["DANBUILDER"] = new LuaDanBuildFunc(writable);
+			LuaScript["GRADIENT"] = new LuaGradientMapFunc(GradientList);
 
+			if (writable)
+				LuaScript["GetSaveFile"] = (Func<int, LuaSaveFile?>)GetLuaSaveFile;
+			else
+				LuaScript["GetSaveFile"] = (Func<int, LuaROSaveFile?>)GetLuaROSaveFile;
+			LuaScript["RequestSongList"] = (Delegate)RequestSongList;
+			LuaScript["GenerateSongListSettings"] = (Delegate)LuaSongListSettings.Generate;
+			LuaScript["IsSongsEnumerating"] = (Func<bool>)(() => OpenTaiko.EnumSongs?.IsEnumerating ?? false);
+			// positive "enumeration fully done" flag (IsSongsEnumerating is also false BEFORE the scan starts)
+			LuaScript["IsSongsEnumDone"] = (Func<bool>)(() => OpenTaiko.EnumSongs?.IsSongListEnumCompletelyDone ?? false);
+
+			LuaScript.DoString(LoadingApiLua, "LOADING");   // skinner loading-bar API (LOADING:Add/Tick), see tBeginYieldable
+			lfBindload.Load(LuaScript);
+			LuaScript["__otk_bindload"] = null; // remove from global
+
+			var outer = _running;
+			_running = this;
+			try {
+				if (File.Exists(this.strScriptPath)) {
+					LuaScript.DoString(File.ReadAllText(this.strScriptPath), this.strScriptShort);
+				} else {
+					strScriptPath = strScriptShort = nameof(fallbackScript);
+					LuaScript.DoString(fallbackScript, strScriptShort);
+				}
+			} finally {
+				_running = outer;
+			}
+
+			lfLoadAssets.Load(LuaScript);
+			lfReloadLanguage.Load(LuaScript);
 
 			if (loadAssets) LoadAssets();
+			CollectLoadGarbage();
 
 			listScripts.Add(this);
 		} catch (Exception e) {
-			Crash(e);
+			Crash(e, $"initializing {nameof(CLuaScript)}");
 		}
 	}
 
@@ -221,12 +532,24 @@ class CLuaScript : IDisposable {
 	public void Dispose() {
 		if (bDisposed) return;
 
-		foreach (IDisposable disposable in listDisposables) {
-			disposable.Dispose();
+		void freeDisposableList<T>(ICollection<T> list) where T : IDisposable? {
+			foreach (var disposable in list)
+				disposable?.Dispose();
+			list.Clear();
 		}
-		listDisposables.Clear();
+		freeDisposableList(this.listDisposables);
+		freeDisposableList(this.TextureList);
+		freeDisposableList(this.CanvasList);
+		freeDisposableList(this.Scene3DList);
+		freeDisposableList(this.SoundList);
+		freeDisposableList(this.VideoList);
+		freeDisposableList(new List<LuaAviUtl2Project>(this.AviUtl2List));   // a project leaves the list as it is freed
+		this.AviUtl2List.Clear();
+		freeDisposableList(this.TextList);
+		freeDisposableList(this.GlyphTextList);
+		freeDisposableList(this.GradientList);
 
-		LuaScript.Dispose();
+		LuaScript?.Dispose();
 
 		bDisposed = true;
 		bLoadedAssets = false;
@@ -234,9 +557,16 @@ class CLuaScript : IDisposable {
 		listScripts.Remove(this);
 	}
 
-	private void Crash(Exception exception) {
+	protected void Crash(Exception exception, string? at = null) {
 		bCrashed = true;
+		// iOS: surface Lua errors to the device console (os_log), which is easier to read than the on-screen overlay.
 
-		LogNotification.PopError($"Lua Script Error: {exception.ToString()}");
+		LogNotification.PopError($"{this.GetType().Name} Error{(string.IsNullOrWhiteSpace(at) ? "" : $" at {at}")}: {exception.ToString()}{
+			((exception.InnerException != null) ? $"\nCause: {exception.InnerException.Message}" : "")
+		}");
+		if (exception.InnerException != null)
+			Trace.TraceError(exception.InnerException.StackTrace);
+		Trace.TraceError($"Full script path: {this.strScriptPath}");
+		Trace.TraceError(exception.StackTrace);
 	}
 }

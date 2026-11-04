@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using Microsoft.Data.Sqlite;
+using static System.Formats.Asn1.AsnWriter;
 
 namespace OpenTaiko;
 
@@ -37,8 +38,8 @@ static class CScoreIni_Importer {
 
 			//Trace.TraceInformation(Status);
 			try {
-				string directory = Path.GetDirectoryName(_score);
-				DirectoryInfo dir_parent = Directory.GetParent(directory);
+				string directory = Path.GetDirectoryName(_score)!;
+				DirectoryInfo dir_parent = Directory.GetParent(directory)!;
 
 				string[] TJAData = Array.Empty<string>();
 				if (File.Exists(GetTJAFile(_score)))
@@ -245,6 +246,22 @@ static class CScoreIni_Importer {
 			} finally { totalcount++; }
 		}
 		Trace.TraceInformation($"Imported {successcount} of {_scoreFiles.Count} scores from score.ini files. ({errorcount} failed imports; {skipcount} skipped imports;)");
+
+		totalcount = successcount = skipcount = errorcount = 0;
+		for (int i = 0; i < OpenTaiko.SaveFileInstances.Length; ++i) {
+			try {
+				var saveFile = OpenTaiko.SaveFileInstances[i];
+				Status = CLangManager.LangInstance.GetString("SETTINGS_SYSTEM_IMPORTSCOREINI_STATUS3", OpenTaiko.SaveFileInstances.Length, successcount, totalcount, errorcount, saveFile.data.SaveId, saveFile.data.Name);
+				saveFile.tInitSaveFile();
+				successcount++;
+			} catch (Exception ex) {
+				Trace.TraceWarning($"Failed to refresh scores for player {i}. More details:\n{ex}");
+				errorcount++;
+			} finally {
+				totalcount++;
+			}
+		}
+		Trace.TraceInformation($"Refreshed {successcount} of {OpenTaiko.SaveFileInstances.Length} players' scores. ({errorcount} failed while refreshing)");
 		Status = "";
 	}
 

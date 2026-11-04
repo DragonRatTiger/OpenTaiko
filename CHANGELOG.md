@@ -1,5 +1,413 @@
 # Changelog
 
+## [0.7.0.4] - 2026-11-04 (Beta)
+
+- [Enhancement] Various minor additions reducing lag spikes
+
+## [0.7.0.3] - 2026-11-03 (Beta)
+
+- [Feat] Add a Chart Videos tab in My Room's TV
+
+## [0.7.0.2] - 2026-11-01 (Beta)
+
+- [Fix] Characters and Puchis didn't provide custom unlock texts and hidden indexes on their API
+
+## [0.7.0.1] - 2026-11-01 (Beta)
+
+- [Fix] Ignore skins older than 0.7.0.0 to prevent missing _boot obscure issues
+- [Fix] Autobuild script did exclude recursively folders with Songs excluding actually important stages folders
+
+## [0.7.0.0] - 2026-11-01 (Beta)
+
+(Note that 0.6.0 skins are no longer supported from this version)
+
+### Major changes
+
+- New My Room: decorate your own room, play your songs on the jukebox, rewatch cutscenes and visit the rooms of other local players
+- Pagoda of the Unknown, in The Fox Dojo: climb a run of randomized Dan floors, with Ume's story along the way
+- Intro Nokon: a music quiz where you name the song from its intro, for 1 to 5 players
+- Replays: watch your best plays again from song select
+- Port to .NET 10
+
+### New features
+
+- OpenTaiko's General Store: spend your coins on new goods refreshed daily
+- Online Lobby (Beta): play together through a room code (off by default, as sharing a room code shares your IP address)
+- Event Mode: a kiosk mode for conventions, with a play limit and a timer on the song choice (OWM specific)
+- Custom Stages menu, to play stages made by the community
+- New result screens (regular, Dan and Survival Mode) and a new Survival Mode select
+- Search, sort and favourites in song select, plus a "Recommended for beginners" folder
+- Note and judgement skins, selectable in the settings
+- Hidden and Flashlight in the Stealth mod, and the Dynamic Beat fun mod
+- Master Volume, Window Mode (windowed, fullscreen or borderless) and Render Resolution settings
+- Characters can come in several colour palettes, and AI Battle has its own opponent character
+- Chart compatibility modes (`COMPAT:`), so charts written for TaikoJiro or TJAPlayer3 play as their charters intended, plus new TJA commands
+- Experimental support for `.osu` charts via the `.optktci` format
+- `.optktcm` and `.optktct` formats to make Dan and Tower charts from existing charts
+- Game event broadcasting, for stream overlays and other tools
+- Export gameplay videos from the command line
+- Something cool if you gather the 4 keys...
+- Full Lua API for skins, stages and characters, documented in nine languages
+
+### Changed features
+
+- AI Battle opponents hit with more human-like timing and use the same randomized mods as you
+- Level 3 and 5 judge zones retuned
+- Auto-roll no longer depends on the frame rate, and its speed can be set
+- Faster song loading and fewer lag spikes during play
+- Text in any language displays correctly, falling back to other fonts for missing characters
+- On Windows, the game follows changes of the audio output device
+- Many crash, softlock and sound fixes, including Linux/Wayland startup and the Windows taskbar icon
+- Base structure for iOS and Android future releases
+
+## [0.6.0.112] - 2026-10-30 (Beta)
+
+- [Fix] Network pinging can crash due to Math.Abs() negated long.MinValue when checking the timestamp
+
+## [0.6.0.111] - 2026-09-12 (Beta)
+
+- [Fix] Graphics Device and inputs not being properly initialized when used with OpenTaiko Hub 0.2 or newer
+
+## [0.6.0.110] - 2026-09-05 (Beta)
+
+- [Chore] Add EXFA unlocks to SongUnlockables.db3
+
+## [0.6.0.109] - 2026-08-15 (Beta)
+
+- [Fix] Song list enumeration not started at launch every next time since 0.6.0.108, because StartUp stage had always been mistreating system sound done loading as song list done enumerating long before exposed as a bug in 0.6.0.108
+- [Fix] Lessen song list enumeration start condition to not rely on transition edge
+- [Feat] Can now hit don on the main menu to enter the game by shrandonm (adapted)
+- [Fix] Could not exit from song select screen if no songs are available
+- [Fix] Unknown nameplate ID crashed 0.6.0 Heya screen
+- [Fix] Stop replay from containing old inputs before retrying [0.6.1 backport]
+- [Fix] Mac BASS audio driver configuration by shrandonm (adapted)
+- [Fix] dx11 color issue [0.6.1 backport]
+
+## [0.6.0.108] - 2026-07-18 (Beta)
+
+* [Fix] MIDI input crashed, fixed by updating managed-midi to 1.10.2, which includes the fix for wrong WinMM MIDI header structure
+* [Fix] Input thread concurrency crashed SDL event handling, fixed using modified window loop with mutex access to `DoEvents()`
+* [Fix] Kusudama never downgraded to regular Balloon since 0.6.0.106
+* [Fix] Rotated barline suddenly disappeared near left or right screen edges
+* [Fix] built-in dev skin: Playing All-Perfect animation in 5P mode truncated out its SENote lane part forever
+* [Feat] Restore the readme screen requiring <kbd>Enter</kbd> removed in 0.6.0.106 and allow song list enumeration at the screen
+* [Chore] Pin release version in `linux_installer_standalone.bash` for release assets in auto build
+* [Fix] speculative wayland fix [0.6.1 backport]
+
+## [0.6.0.107] - 2026-05-23 (Beta)
+
+- [Chore] Add Unlockables for Chapter 7 (and few more)
+
+## [0.6.0.106] - 2026-05-01 (Beta)
+
+- [Fix] Custom metadata handling:
+- [Fix] Course-global metadata (`.FORCEGAUGE`, `.BOOMRULE`) ignored non-selected difficulties and headers past the selected player-side
+- [Fix] Respecifying custom metadata caused exception and prevented setting metadata, notably for overriding pre-`COURSE:` headers in individual COURSEs and for each player-side under same difficulty
+- [Fix] Separate (actual in-game) player-side custom metadata from (on song list) course-global metadata
+- [Fix] Separate and fix issues of (on song list) COURSE-global metadata and (in-game) player-side metadata:
+- [Fix] Misjudging branched chart for deduplicating unended roll or unknown note warning
+- [Fix] Make in-game LEVEL: use the value set for each player-side as in TaikoJiro (affects gauge difficulty and Discord gameplay status), making "deceptive star rating" work (0auBSQ/OpenTaiko#625)
+- [Fix] `#NM`/`BM`/`HBSCROLL` before `#START` affects next player-sides' charts
+- [Optimize+Enhance] Improve Kusudama multiplay matching:
+- [Optimize] Speed up multiplay Kusudama matching
+- [Enhance] Allow Kusudamas if in single play or if put almost consistently in branched section
+- [Enhance] Downgrade Kusudama to balloon if length does not almost match
+- [Enhance] Prevent multiple Kusudamas from matching to a single Kusudama and not downgrading to balloons
+- [Fix+] Multiplayer Kusudama handling (+ details)
+- [Fix] Properly handle overlapped Kusudamas as individual notes instead of accumulate pop count
+- [Fix] P2+ character(s) could not return to default animation after Kusudama clear or fail
+- [Enhance] Implement non-shin-uchi Potato (Kusudama) clear bonus (0auBSQ/OpenTaiko#297) (reduced bonus past bonus border, all players gain score when clear)
+- [Enhance] Reduce score per Kusudama hit in multiplayer: 1: 100pts, 2: 50pts, 3: 30pts, 4-5: 20pts
+- [Feat] Initial `#PARTNERNOTE` command support (0auBSQ/OpenTaiko#827) (only display notes' "hand"/link, if having neighbors)
+- [Fix] Wrongly selected first pre-`COURSE:` (Oni) charts matching current player-side when the intended chart (possible not Oni) is defined after `COURSE:`
+- [Feat] Support multiplayer chart beyond `STYLE:2` (accessible up to `STYLE:5` in game)
+- [Fix] 0.6.0.103 broke log file output due to wrong initializing order, cause found by _griefsyndrome & stephen-huan (0auBSQ/OpenTaiko#917)
+- [Fix] 0.6.0.103 made AI battle song-end animation played for AI
+- [Fix] 0.6.0.103 caused abnormal long fading out when exiting AI battle after song-end animation has been played
+- [Fix] AI battle sections were not finished and counted as failed when song ends before `#END`
+- [Fix] Recorded high score included last scored hit twice
+- [Fix] Gameplay failed immediately at start and notes seemed to be in `#SCROLL 0` after disabling Kanpeki mode after Kanpeki fail
+- [Fix] Autorolls were not disabled when failed mid-song
+- [Enhance] Stop counting judgements after failed mid-song
+- [Optimize] Major optimizing for note-count-heavy charts:
+- [Fix] Buffered input was never enabled until reloading Config.ini
+- [DeFeat] Remove the option to disable buffered input (now always enabled) to simplify input handling
+- [Feat] Allow finer input timestamp than draw FPS by polling input in a separate thread (period >= 1ms)
+- [Chore] Fix (unused) `CLagLogger` was not excluding Bongo rolls
+- [Fix] Report note hit offset was always positive
+- [Fix] Mid-branch `#GAMETYPE` affected notes from other branches
+- [Fix] Dan-i could give wrong result in result screen due to notes after song-end animation plays
+- [Feat] prevent pause (<kbd>Esc</kbd> and <kbd>F1</kbd>) buffering (back-ported from 0.6.1)
+- [Fix] Fuseroll explodes did not update Dan-i states immediately
+- [Feat] Penalize Boom judgement as BAD in AI battle mode
+- [Fix] Autoplay could still play hit-types notes after mid-song failure
+- [Fix] Prevent mid-song failure from being treated in result screen and from being recorded as clear
+- [Fix] Reloading song list in setting while song list is enumerating crashed the game, due to: 1. using no longer implemented `Thread.Abort()`; 2. resetting song index when song list is empty
+- [Optimize] Speed up `OnlineLounge` song list update by avoiding removing list elements in middle
+- [Feat] Properly remember cursor position in Dan-i and tower select menu (0auBSQ/OpenTaiko#664)
+- [Feat] Remember cursor position in last entered descendant folders in Dan-i and tower selection screen
+- [Fix] Dan-i and tower song select menu missed songs if a dan-i/tower root `box.def`'s song genre matches the keyword or if multiple dan-i/tower roots exist
+- [Fix] Online song downloaded to wrong folder if the download folder is not placed in the root song folder
+- [Enhance] Smoothen the animations in the song loading screen using async loading (back-ported from 0.6.1)
+- [Perf] Stop creating a temporary list of the entire expanded song list every time the cursor moves in song select menu
+- [Fix] Closing nested folder misplaced the selection cursor in TJAP3 folder mode (only show items in current folder)
+- [Fix] Reloading song list or <kbd>Esc</kbd> at result screen made song selection cursor jump to the root song folder
+- [Fix] Prevent desynced song state when closing song folder or reloading song list
+- [Fix] Best scores database was not reloaded after running Import Score.ini Files command (0auBSQ/OpenTaiko#681)
+- [Fix] `#GOGOSTART`/`END` in non-branched sections failed to set per-branch go-go state (for planned Jiro1 mode)
+- [Fix] `.BOOMRULE:Ratio`: Branched bombs & fuzerolls used wrong branch for gauge penalty at-or-after branch judge point and before actual branch point
+- [Enhance] Log C# stack trace for Lua errors
+- [Chore] Simplify simple Lua function calling using `RunLuaCode` for `ScriptBG`
+- [Fix] Calling missing Lua function now only emit a readable warning instead of hard error
+- [Enhance] Refine Lua errors by properly including (simplified) script file path and class name
+- [Fix] Pressing and releasing a key within 1 frame was ignored except for (now always buffered) gameplay input
+- [Fix] <kbd>Esc</kbd> issues: Spamming <kbd>Esc</kbd> restart exit animation in gameplay quit, dan-i select (also fix characters flicking), my room, online lounge (also fix "Return to main menu" hid menu); fix tower exit sound overlapped with menu sound
+- [Chore] Prevent caught exception for inserting implicit `#END` at music end if music does not exist or failed to load
+- [Fix] (Puchi) Character index out-of-range crashes (backported from 0.6.1)
+- [DeFeat] Remove the readme screen requiring <kbd>Enter</kbd> (backported from 0.6.1)
+- [Fix] File-global header `HEADSCROLL:` had no effects
+- [Chore] Show in-game `LEVEL:` and custom headers in `ImGui` debug window > Stage
+- [Fix] Extra regular balloon was drawn above currently rolling Fuze roll
+- [Enhance] Better Partner note display: Downgrade to non-Partner note if no neighbors (0auBSQ/OpenTaiko#829)
+- [Enhance] Better Partner note display: Hide hands/links to non-neighbors
+- [Chore] Simplify note drawing and update hands/links counter per frame, not per note
+- [Fix] Frame-interval-dependent animations were inaccurate due to loss of sub-ms precision (character, dancer, Lua scripts using `DeltaTime`)
+- [Fix] Partner note's links/hands misaligned by default except for SimpleStyle (720p)
+- [Fix] built-in dev skin: Playing dan-i consecutively made dan-i end animation only play properly for the first time
+- [Fix] Song title and gauge disappeared after failing mid-song or quitting song after song-end animation plays
+- [Feat] Update/cancel song-end/mid-song-fail animation when clear/dan-i status changes
+- [Fix] Red-passed less-type dan-i gauges failed to update to red-pass colors at end of play
+- [Fix] Section score cleared after last AI battle section
+- [Fix] Song-end/mid-song-fail animation failed to refresh on skin reload until played in different game mode (regular, Dan-i, Tower, & AI battle) (0auBSQ/OpenTaiko#914)
+- [i18n] Localize the "Now enumerating songs. Please wait..." message
+- [Chore] Fix line end broke scripts for Linux (0auBSQ/OpenTaiko#916)
+- [Chore] Fix install-dotnet-sdk.sh did not install .NET 8.0 required by current OpenTaiko, but installed .NET 7.0 instead
+- [Chore] replace singleton for floormanagement by play-scope instance (0.6.1)
+- [Chore] move some important variables out of `CStageSongSelect` (0.6.1)
+- [Chore] move currently selected song out of the song select class. (0.6.1)
+- [Chore] Make `CActFIFO*` classes all derived from abstract `CActFIFOBase` (new)
+
+## [0.6.0.105] - 2026-04-04 (Beta)
+
+- [Enhancement] Increase the amount of coins obtained in Easy, Normal, Hard difficulties
+- [Enhancement] Cap the level to 13 and the song speed to x2 in the coins calculation formula
+- [Enhancement] Add the possibility to unlock Stormrider's Bolt and linebreak via coins to prevent a too long grind for the events
+- [Enhancement] Make one of the unlock condition texts for the April Fools 2026 event clearer
+- [Chore] Change the unlock condition for Another Reality from Full Combo Neptune's Lullaby to 200 Coins
+
+## [0.6.0.104] - 2026-03-29 (Beta)
+
+- [Feat] Getting a cutscene now sets a global trigger on results screen activation to be usable in unlockables (retroactive for cutscenes that play only once)
+- [Chore] Keep a dictionary of all custom metadata (starting by .) in a chart for future usage in 0.6.1
+- [Chore] Unlock conditions for and soar through the universe (ch6) and cocoa break (Dashy's Depictions)
+
+## [0.6.0.103] - 2026-03-28 (Beta)
+
+- [Feat] New TJA header `.FORCEGAUGE:`, which forces the gauge type for the player-side
+- [Feat] New TJA header `.BOOMRULE:`, which specifies the gauge penalty of the BOOM judgement for the player-side
+- [Feat] Multi-value `SCENEPRESET:` (separated by comma (`,`)) for TJA and box.def to randomly use one of specified scenes
+- [Feat] Add new branch condition rules and ranges (based on (0auBSQ/OpenTaiko#807))
+- [Feat] Rotate barlines according to scroll direction like in TaikoJiro2
+- [Feat] Support reading `inf` and `infinity` (case-insensitive) in TJA as `Infinity`
+- [Enhance] TJA `#BRANCHSTART:` Allow omitting comma (,) between multi-letter condition type and value, and reject unknown type or range
+- [Enhance] Make the following header per-player-side: `GAME:`, `HIDDENBRANCH:`, `SIDE:`, `LIFE:`, `TOWERTYPE:`, `DANTICK:`, `DANTICKCOLOR:` (specifying them before the first `COURSE:` sets the default value of all difficulties)
+- [Enhance] Make TJA NOTESDESIGNER headers per-player-side and respect difficulty number if defined before the first `COURSE:` in TJA
+- [Enhance] Adjust gameplay stack order to be debug texts > fading-in/out > lyrics > training UI > OBJ > notes > background and training bar (from top layer to bottom layer)
+- [Enhance] Make log more complete (Allow logging to file before reading Config.ini, log exception in some empty catches, set up inner exceptions in nested throws)
+- [Fix] Big note branch score was not tracked
+- [Fix] Game crashed when the played OBJ command contains non-registered obj name
+- [Fix] Eased value for OBJ command was truncated to int
+- [Fix] Not all OBJ/CAM command states were reset properly on retry
+- [Fix] CAM commands failed to apply to the main screen
+- [Fix] `#BORDERCOLOR` command had no effects
+- [Fix] Lyrics and OBJs could not hide when retry or rewind
+- [Fix] OBJ & CAM commands did not respect play speed
+- [Fix] `#SUDDEN` move offset had no effects
+- [Fix] `#ENABLEDORON` & `#DISABLEDORON` were not per-player and did not reset after retrying gameplay
+- [Fix] `#SUDDEN` could not hide SENote and `#ENABLE`/`DISABLEDORON`, `#SUDDEN`, note hidden upon hit, & balloon appear during popping interfered with each other
+- [Fix] TJA `#SCROLL` could not parse number containing Infinity successfully
+- [Fix] TJA `#SUDDEN` could not handle Infinity values
+- [Fix] `#DELAY Infinity` crashed the game
+- [Fix] Could not select difficulties with `LEVEL:Infinity` or negative value (needs hard reloading song list)
+- [Fix] `LEVEL:10.45` displayed as 10+, `LEVEL:12.95` as 12(-) (for examples) due to unintended rounding
+- [Fix] COURSE-scope headers ignored the default scope before the first `COURSE:`, broken some charts made for TaikoJiro
+- [Fix] Invalid commands starting with `#BRANCHSTART` made the difficulty treated as branched chart
+- [Fix] Pre-COURSE LEVEL: broke difficulty available test (0auBSQ/OpenTaiko#625) (needs hard reloading)
+- [Fix] Per-player-side headers beyond selected player-side chart not ignored, broke per-player-side BALLOON and other headers
+- [Fix] Displayed puchi/character coin multiplier did not include rarity multiplier in Heya
+- [Optimize] Stop processing finished or truncated OBJ/CAM commands
+- [Chore] Decompose `EBranchConditionType` into `Exam.Type`, `EBranchCondBig`, & `Exam.Range`
+- [Chore] Simplify CAM command handling during gameplay
+- [Chore] Fix `CLang.GetExamName()` matched exam type by raw int and would break if Exam.Type changes
+
+## [0.6.0.102] - 2026-03-24 (Beta)
+
+- [Fix] 0.6.0.101 made Pause -> Resume made chart jumped to song start due to the main timer was not reset correctly
+
+## [0.6.0.101] - 2026-03-24 (Beta)
+
+- [Optimize] Skip texture loading when calling AddGraph() in BG Lua Script multiple times with same filepath
+- [Chore] Allow tDisposeSafely() to handle CSound and (was handled by t安全にDisposeする() (lit. tDisposeSafely)) Array
+- [Optimize] Only unload song-end/fail animations for non-in-use game modes after exiting gameplay screen
+- [Fix] Prevent gameplay from starting/resuming when status reset is not complete
+- [Fix] "Character doesn't miss" when missed in gameplay
+- [Fix] Allow gameplay to continue when hard/Kanpeki failed in AI battle mode
+
+## [0.6.0.100] - 2026-03-22 (Beta)
+
+- [Fix] Refine gameplay time point and fix related issues (after climbed to tower top in tower mode, 2 seconds after last note, 1 second after `#END`, 0 seconds after music ends)
+- [Fix] Stop aligning branch end (except at end of song) in TJAP3 or OOS compatibility mode
+- [Fix] Prevent branch judge point before last measure (or `#NEXTSONG`, or 4 beats before chart start)
+- [Fix] Every player now has individual lives in Kanpeki mode
+- [Enhancement] Make mid-song fail animation play per player, and stop chart right when all players have failed [WARNING: skinners might need to update `<skin>/Graphics/5_Game/9_End/ClearFailed/Script.lua`]
+- [Enhancement] Missing end-of-play animation/sounds now fallbacks to red-pass (for Dan-i mode) or regular chart's animation/sounds
+- [Fix] Non-keyboard devices could not use some menus due to `CKeyAssign.KeyIsPressed()` could only detect keyboard inputs (0auBSQ/OpenTaiko#908)
+- [Feat] Reimplement MIDI input using managed-midi, using TJAPlayer3-f's implementation as reference (0auBSQ/OpenTaiko#612)
+- [Enhancement] Remember up to 36 (from 10) input devices per device type (Keyboard and Mouse remain not remembered)
+- [Fix] Ensure gameplay inputs are processed in event timestamp order
+- [Fix] In training mode, prevent pausing or (un)set bookmark during playing when the keybind is also player's game input (0auBSQ/OpenTaiko#903)
+- [Fix] Prevent wrong judgement window due to wrongly using "actual player index"
+- [Fix] Autoplay could only properly hit 1 note per frame, could miss when game lags, and could not handle multi-hit note misses properly
+- [Fix] Displayed score became less than real score when exceeding 256 score increases in a frame
+- [Fix] Played song speed was old one when first playing after adjusting song speed in training mode
+- [Fix] Crashes on selecting undefined difficulties (`LEVEL` before `COURSE`), again
+- [Fix] Towers with missing or negative `LIFE:` immediately failed player while having 5 lives (unless using Pause -> Retry)
+- [Fix] Kanpeki fail in tower chart at top floor could be judged as pass
+- [Fix] Disable Kanpeki mode in training mode
+- [Fix] Adlib and bomb were neither hit by autoplay nor missed and broke Dan-i condition monitoring
+- [Fix] Bomb and fuze roll did not trigger hard gauges and Kanpeki mode failure
+- [Fix] Tight (notelock) mode did not give BAD for empty hits since 0.6.0.93
+- [Fix] Lyrics from `#LYRICS` appeared at wrong time in Dan-i mode
+- [Fix] Make TJA `LYRICFILE:` alias of `LYRICS:`
+- [Fix] Warn and ignore bad characters from TJA note data, for handling ill-formed comment (ignore if not digit nor letter)
+- [Fix] `box.def` parsing trimmed too many characters for values and allow omitting of colon (`:`)
+- [Fix] Calling `AddGraph()` in BG Lua Script twice with same filepath caused exception
+- [Fix] All BG Lua script errors are now logged and shown on screen
+- [Fix] Force big note firework for balloon's flying note
+- [Fix] AI battle section progression bar was negative before chart start
+- [Fix] Bad note position precision for extremely big/small SCROLL combined with small/big BPM values
+- [Fix] Clearing fuzeroll lacked character animation
+- [Fix] Roll redness fading out speed depended on framerate
+- [Fix] Notes and bar lines now continue at end of song and stop when failed in tower/Dan-i/Kanpeki failure, instead of simply disappearing
+- [Fix] Balloon's and fuze's remaining pop count was semi-transparent after non-balloon roll count fading out
+- [Fix] Revert `#DIRECTION` behavior to TJAP3 (keep vertical scrolling of non-real `#SCROLL`), accidentally changed in v0.6.0.56
+- [Fix] Characters now play clear-out + miss-down animation when failed mid-song
+- [Fix] Bugs related to song end or mid-song failure animation
+- [Fix] Wrong character animation played when finishing tower
+- [Fix] Draw pop select menu on top, above fading in/out
+- [Fix] Opened Kusudama is now shown when pause menu is open
+- [Optimize] Minor optimizing for note-count-heavy charts:
+- [Optimize] Pre-build name-to-index lookup dictionary for puchi charas
+- [Optimize] Cache double-to-integer converted chip time
+- [Optimize] Only update `chip.nLag` when the note is actually judged
+- [Optimize] Make `enum NoteType` values same as channelNo to reduce conversions
+- [Optimize] Skip chip post processing of TJA parsing if is for song enumeration
+- [Optimize] Make `listBPM` an actual List instead of a Dictionary (due to legacy DTX parsing)
+- [Optimize] Only query all input devices for gameplay once instead of `EPad.Max` (38) times
+- [Optimize] Replace `OrderBy()` with in-place sort stabilized by index to eliminate temporary list
+- [Optimize] song-end animation could load twice or unused sound resources by only (un)loading at (De)`Activate()`
+- [Chore] Extract and use `NotesManager.GetChipGameType()`
+- [Chore] Remove unused fields in `CChip`
+- [Chore] Simplify input device querying
+- [Chore] Merge `enum EInputDevice` into FDK's `enum InputDeviceType`
+- [Chore] Simplify key assignment defining and accessing
+
+## [0.6.0.99] - 2026-02-13 (Beta)
+
+- [Chore] Change the unlock conditions for Assimilation
+- [Chore] Add unlock conditions for the Touhou Arrangements Vol.2 folder
+
+## [0.6.0.98] - 2026-02-08 (Beta)
+
+- [Hitsounds] Update the Taiko hitsounds
+- [Hitsounds] Add Bol and Clap histsounds
+
+## [0.6.0.97] - 2026-02-01 (Beta)
+
+- [Fix] Fix some wrong song unlock conditions
+
+## [0.6.0.96] - 2026-01-30 (Beta)
+
+- [Chore] Add unlock conditions for Chapter 6 and Project Pentjet songs
+- [Chore] Add unlock conditions for Nep05, Nep08, Nep09
+- [Chore] DISCARDED_DISRUPTION now also requires clearing Zealous Seeker to unlock
+
+## [0.6.0.95] - 2026-01-18 (Beta)
+
+- [Feat] Basic support for broadcasting game events to external processes
+
+## [0.6.0.94] - 2025-12-12 (Beta)
+
+- [i18n] Update spanish translations
+
+## [0.6.0.93] - 2025-11-05 (Beta)
+
+- [Feat] Loosen note data line syntax for future compatibility (accept if starts with digit, reject if starts with `#` or contains `:`).
+- [Feat] Support forcing initial game type using `GAME:` (applies to all charts for a difficulty).
+- [Feat] Make notes’ `#GAMETYPE` fixed instead of changing at `#GAMETYPE`.
+- [Feat] Make input judgement skip notes not consuming the input color, allowing hitting nearby Ka+Don as Don+Ka.
+- [Feat] Prevent Clap inputs from triggering AdLibs, Mines, and empty BADs in Taiko mode.
+- [Feat] Allow using both Bongo drums (Po and Pa) to hit Bongo-mode balloon-type notes (autoroll also uses both).
+- [Feat] Give notes displayed over overlapped rolls higher judge priority, keeping earlier notes prioritized over later-defined rolls.
+- [Feat] Allow early BAD judgement for notes over overlapped rolls.
+- [Feat] Stop multi-hit notes from waiting for more hits if the first hit is already BAD.
+- [Feat] Make autoplay simulate game input instead of judging notes individually.
+- [Feat] Make autoroll hit Bongo D (Pink) rolls and Bongo balloon-type notes using Po & Pa alternatively.
+- [Feat] Make battle AI hit bombs and miss fuze rolls by AI level’s Mine judgement percentage.
+- [Feat] Hide fuze roll after it explodes.
+- [Enhancement] Autoplay uses Left Blue + Right Red for Bongo D (Pink) instead of Left Red.
+- [Fix] Regression 0.6.0.48 widened balloon-type notes’ head timing window (17ms) to BAD window.
+- [Fix] Regression 0.6.0.90 broke training mode branch switching availability check.
+- [Fix] Calculated gen-4 Shun-uchi score was too high due to limiting counted balloon-type hits to ≈0.06 hits/s (1/275.56x of expected speed).
+- [Fix] Crash when a chart had any <16.6 hit/s balloons but no missable notes (previously only crashed for ≈<0.06 hit/s balloons).
+- [Fix] Make `#GAMETYPE` argument case-insensitive.
+- [Fix] Past notes were judged from nearest to oldest (except for AdLib & Bomb).
+- [Fix] Ensure only AdLib & Bomb are judged from nearest to oldest.
+- [Fix] Give future non-BAD more priority over past BAD.
+- [Fix] Prevent missed notes from being judged.
+- [Fix] Hitting every big note with big note judgement or KaDon/(Pink)D gave an empty BAD in note lock mode.
+- [Fix] Multi-hit notes were not judged by the first hit.
+- [Fix] Multi-hit notes and roll-type notes ignored input timestamp.
+- [Fix] Ensure waiting multi-hit notes for past judgement are searched.
+- [Fix] Empty BAD behavior in Tight (note lock) mode broke all players’ combo and lacked stage failure, Tower damage, and Dan-i combo break.
+- [Fix] Single-hit big note closely followed by unhit notes was judged as miss.
+- [Fix] Prevent hitting a roll from being mistaken as hitting a multi-hit note.
+- [Fix] Balloon-type roll speed of puchi chara autoroll skill varied with song speed.
+- [Fix] Autoplay was not single-hitting big notes when big note judgement disabled.
+- [Fix] Autoplay used wrong hand for non-roll-type notes.
+- [Fix] Make autoroll independent of rolled count and fix only first autoplayer hit Kusudama.
+- [Fix] Game type (Taiko or Bongo) failed to reset when seeking within or exiting training mode.
+- [Fix] Replay did not record inputs after last note.
+- [Fix] Incorrect training mode branch switching point in empty measures (now uses last reached measure).
+- [Fix] Autoroll hit flash was always red even for colored Bongo rolls.
+- [Fix] Autoplay made big notes’ flying note small.
+- [Fix] Autoplay played drum sounds for wrong player.
+- [Fix] Ensure both lane flashes start when autoplay hits Purple or D (Pink) notes.
+- [Fix] Wrong `#SPLITLANE` offset amount of Bongo rolls.
+- [Fix] Bongo double and clap notes were not centered in `#SPLITLANE`.
+- [Fix] Bongo double roll placed into Po (red) lane in `#SPLITLANE`.
+- [Fix] SENotes calculation ignored Kusudama, Handed notes, Bomb, Adlib, and Konga rolls.
+- [Fix] SENotes for `I` and `H` defaulted to Don/Pon.
+- [Fix] Bongo double roll’s SENote was not small roll’s but Taiko big roll’s.
+- [Fix] Bongo clap roll’s flying note was Pa (Yellow).
+- [Fix] Prevent big note effects of Konga notes.
+- [Fix] Prevent flying notes from changing when `#GAMETYPE` changes.
+- [Fix] Hit flash colors were not adjusted to `#GAMETYPE` changes.
+- [Fix] Hitting or missing Fuze roll or Bongo rolls made character emit runners.
+- [Fix] Character’s miss animation did not play for BOOM judgement.
+- [Fix] Big variant of note explosion around judge mark was never used.
+- [Fix] Wrong roll counter number if multiple rolled bar rolls overlapped.
+- [Fix] Notes waiting for more hits were not aligned vertically to judge mark.
+- [Fix] Wrong flying note fade-out mask shape for Kadon and Konga notes.
+- [Fix] Prevent AdLib hits from emitting flying notes.
+- [Fix] Missing big note explosion around judge mark when hitting bigly OK.
+- [Fix] Big note effects played for small hits on big notes.
+- [Fix] Big roll’s flying notes lacked firework tail.
+- [Fix] Overlapped judge text and explosions rendered twice.
+- [Fix] Autoroll flying notes appeared doubled.
+- [Fix] Input sound played when balloon-type note clear sound played.
+- [Fix] Hitting balloon-type notes with real input played hit sound twice.
+
 ## [0.6.0.92] - 2025-10-20 (Beta)
 
 - [HotFix] Fix gauge not decreasing correctly on miss due to the previous version

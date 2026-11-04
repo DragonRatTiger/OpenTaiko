@@ -19,7 +19,7 @@ internal class CLang {
 		get { return File.Exists(Path.Combine(Folder, _boxFontName)) ? Path.Combine(Folder, _boxFontName) : _boxFontName; }
 		private set { _boxFontName = value; }
 	}
-	public string Folder { get { return @$"{OpenTaiko.strEXEのあるフォルダ}Lang{Path.DirectorySeparatorChar}{Id}{Path.DirectorySeparatorChar}"; } }
+	public string Folder { get { return OpenTaiko.ResolveAssetPath(@$"{OpenTaiko.strEXEFolder}Lang{Path.DirectorySeparatorChar}{Id}{Path.DirectorySeparatorChar}"); } }
 
 	private string _fontName = CFontRenderer.DefaultFontName;
 	private string _boxFontName = CFontRenderer.DefaultFontName;
@@ -34,14 +34,14 @@ internal class CLang {
 
 			JsonNodeOptions options = new JsonNodeOptions() { PropertyNameCaseInsensitive = false };
 			JsonDocumentOptions doc = new JsonDocumentOptions() { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
-			JsonNode node = JsonNode.Parse(data, options, doc);
+			JsonNode node = JsonNode.Parse(data, options, doc)!;
 
 			clang.Id = id;
-			clang.Language = node["Language"].Deserialize<string>();
-			clang.Entries = node["Entries"].Deserialize<Dictionary<string, string>>();
-			clang.InvalidKey = node["InvalidKey"].Deserialize<string>();
-			clang.FontName = node["FontName"].Deserialize<string>().FixPath();
-			clang.BoxFontName = node["BoxFontName"].Deserialize<string>().FixPath();
+			clang.Language = node["Language"].Deserialize<string>()!;
+			clang.Entries = node["Entries"].Deserialize<Dictionary<string, string>>()!;
+			clang.InvalidKey = node["InvalidKey"].Deserialize<string>()!;
+			clang.FontName = node["FontName"].Deserialize<string>()!.FixPath();
+			clang.BoxFontName = node["BoxFontName"].Deserialize<string>()!.FixPath();
 
 			return clang;
 		} else {
@@ -58,6 +58,10 @@ internal class CLang {
 		return File.Exists(out_path);
 	}
 
+	/// <summary>True if this language file actually defines <paramref name="key"/> (so callers can fall back to
+	/// another source, e.g. a per-skin locale, instead of getting the InvalidKey placeholder).</summary>
+	public bool HasString(string key) => Entries != null && Entries.ContainsKey(key);
+
 	public string GetString(string key) {
 		return (Entries.TryGetValue(key, out string? value)) ? value : InvalidKey.SafeFormat(key);
 	}
@@ -65,55 +69,55 @@ internal class CLang {
 		return (Entries.TryGetValue(key, out string? value)) ? value.SafeFormat(values) : InvalidKey.SafeFormat(key);
 	}
 
-	public string GetDifficulty(int diff) {
+	public string GetDifficulty(Difficulty diff) {
 		switch (diff) {
-			case -1:
+			case (Difficulty)(-1):
 				return GetString("DIFF_ANY");
-			case (int)Difficulty.Easy:
+			case Difficulty.Easy:
 				return GetString("DIFF_EASY");
-			case (int)Difficulty.Normal:
+			case Difficulty.Normal:
 				return GetString("DIFF_NORMAL");
-			case (int)Difficulty.Hard:
+			case Difficulty.Hard:
 				return GetString("DIFF_HARD");
-			case (int)Difficulty.Oni:
+			case Difficulty.Oni:
 				return GetString("DIFF_EX");
-			case (int)Difficulty.Edit:
+			case Difficulty.Edit:
 				return GetString("DIFF_EXTRA");
-			case (int)Difficulty.Tower:
+			case Difficulty.Tower:
 				return GetString("DIFF_TOWER");
-			case (int)Difficulty.Dan:
+			case Difficulty.Dan:
 				return GetString("DIFF_DAN");
 			default:
 				return GetString("DIFF_UNKNOWN");
 		}
 	}
-	public string GetDifficulty(Difficulty diff) { return GetDifficulty((int)diff); }
-	public string GetExamName(int exam) {
+	public string GetDifficulty(int diff) { return GetDifficulty((Difficulty)diff); }
+	public string GetExamName(Exam.Type exam) {
 		switch (exam) {
-			case 0:
-				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_SOUL");
-			case 1:
-				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_GOOD");
-			case 2:
-				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_OK");
-			case 3:
-				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_BAD");
-			case 4:
-				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_SCORE");
-			case 5:
-				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_ROLL");
-			case 6:
-				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_HIT");
-			case 7:
-				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_COMBO");
-			case 8:
-				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_ACCURACY");
-			case 9:
-				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_ADLIB");
-			case 10:
-				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_BOMB");
 			default:
-				goto case 0;
+			case Exam.Type.Gauge:
+				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_SOUL");
+			case Exam.Type.JudgePerfect:
+				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_GOOD");
+			case Exam.Type.JudgeGood:
+				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_OK");
+			case Exam.Type.JudgeBad:
+				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_BAD");
+			case Exam.Type.Score:
+				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_SCORE");
+			case Exam.Type.Roll:
+				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_ROLL");
+			case Exam.Type.Hit:
+				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_HIT");
+			case Exam.Type.Combo:
+				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_COMBO");
+			case Exam.Type.Accuracy:
+				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_ACCURACY");
+			case Exam.Type.JudgeADLIB:
+				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_ADLIB");
+			case Exam.Type.JudgeMine:
+				return CLangManager.LangInstance.GetString("DAN_CONDITION_NAME_BOMB");
 		}
 	}
+	public string GetExamName(int exam) { return GetExamName((Exam.Type)exam); }
 }

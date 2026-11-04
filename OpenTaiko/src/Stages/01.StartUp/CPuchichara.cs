@@ -5,25 +5,18 @@ using Silk.NET.Maths;
 namespace OpenTaiko;
 
 class CPuchichara {
-	public CTexture tx;
-	public CTexture render;
+	public CTexture? tx;
 	public CSkin.CSystemSound welcome;
 	public DBPuchichara.PuchicharaData metadata;
 	public DBPuchichara.PuchicharaEffect effect;
 	public CUnlockCondition? unlock;
 	public string _path;
 
-	public float GetEffectCoinMultiplier() {
-		float mult = 1f;
-
-		mult *= HRarity.tRarityToRarityToCoinMultiplier(metadata.Rarity);
-		mult *= effect.GetCoinMultiplier();
-
-		return mult;
-	}
+	public float GetEffectCoinMultiplier(bool allPurpleEnabled = true, bool autorollEnabled = true, bool showAdlibEnabled = true, bool splitLaneEnabled = true)
+		=> effect.GetCoinMultiplier(HRarity.tRarityToRarityToCoinMultiplier(metadata.Rarity), allPurpleEnabled, autorollEnabled, showAdlibEnabled, splitLaneEnabled);
 
 	public void tGetUnlockedItems(int _player, ModalQueue mq) {
-		int player = OpenTaiko.GetActualPlayer(_player);
+		int player = _player;
 		var _sf = OpenTaiko.SaveFileInstances[player].data.UnlockedPuchicharas;
 		bool _edited = false;
 
@@ -60,28 +53,12 @@ class CPuchichara {
 			tx.vcScaleRatio = new Vector3D<float>(OpenTaiko.Skin.Game_PuchiChara_Scale[0]);
 		}
 
-		// Heya render
-		render = OpenTaiko.Tx.TxCAbsolute($@"{path}{Path.DirectorySeparatorChar}Render.png");
-
 		// Puchichara welcome sfx
 		welcome = new CSkin.CSystemSound($@"{path}{Path.DirectorySeparatorChar}Welcome.ogg", false, false, true, ESoundGroup.Voice);
 
-		// Puchichara metadata
-		if (File.Exists($@"{path}{Path.DirectorySeparatorChar}Metadata.json"))
-			metadata = ConfigManager.GetConfig<DBPuchichara.PuchicharaData>($@"{path}{Path.DirectorySeparatorChar}Metadata.json");
-		else
-			metadata = new DBPuchichara.PuchicharaData();
-
-		// Puchichara metadata
-		if (File.Exists($@"{path}{Path.DirectorySeparatorChar}Effects.json"))
-			effect = ConfigManager.GetConfig<DBPuchichara.PuchicharaEffect>($@"{path}{Path.DirectorySeparatorChar}Effects.json");
-		else
-			effect = new DBPuchichara.PuchicharaEffect();
-
-		// Puchichara unlockables
-		if (File.Exists($@"{path}{Path.DirectorySeparatorChar}Unlock.json"))
-			unlock = OpenTaiko.UnlockConditionFactory.GenerateUnlockObjectFromJsonPath($@"{path}{Path.DirectorySeparatorChar}Unlock.json");
-		else
-			unlock = null;
+		metadata = ConfigManager.ReadOr(Path.Combine(path, "Metadata.json"), ConfigManager.GetConfig<DBPuchichara.PuchicharaData>, new DBPuchichara.PuchicharaData());
+		effect = ConfigManager.ReadOr(Path.Combine(path, "Effects.json"), ConfigManager.GetConfig<DBPuchichara.PuchicharaEffect>, new DBPuchichara.PuchicharaEffect());
+		unlock = ConfigManager.ReadOr<CUnlockCondition?>(Path.Combine(path, "Unlock.json"), p => OpenTaiko.UnlockConditionFactory.GenerateUnlockObjectFromJsonPath(p), null);
+		metadata.Rarity = CUnlockCondition.tRarityOverride(unlock, metadata.Rarity, path);
 	}
 }

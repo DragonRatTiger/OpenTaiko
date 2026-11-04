@@ -13,8 +13,10 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 		protected set;
 	}
 	public long OutputDelay {
-		get;
-		protected set;
+		get {
+			this.tReadClock();
+			return this.nBytesPerSec > 0 ? this.nUnplayedBytes * 1000 / this.nBytesPerSec : 0;
+		}
 	}
 	public long BufferSize {
 		get;
@@ -24,17 +26,35 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 	// CSoundTimer 用に公開しているプロパティ
 
 	public long ElapsedTimeMs {
-		get;
-		protected set;
+		get {
+			this.tReadClock();
+			return (long)this.msPlayed;
+		}
+	}
+	public double dbElapsedTimeMs {
+		get {
+			this.tReadClock();
+			return this.msPlayed;
+		}
 	}
 	public long UpdateSystemTimeMs {
-		get;
-		protected set;
+		get {
+			this.tReadClock();
+			return this.msUpdateSystemTime;
+		}
+	}
+	public double dbUpdateSystemTimeMs {
+		get {
+			this.tReadClock();
+			return this.dbmsUpdateSystemTime;
+		}
 	}
 	public CTimer SystemTimer {
 		get;
 		protected set;
 	}
+
+	public long nBytesPerSec { get; protected set; }
 
 	public enum EWASAPIMode { Exclusion, Share }
 
@@ -96,11 +116,7 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 		Trace.TraceInformation("BASS (WASAPI) の初期化を開始します。");
 
 		this.SoundDeviceType = ESoundDeviceType.Unknown;
-		this.OutputDelay = 0;
-		this.ElapsedTimeMs = 0;
-		this.UpdateSystemTimeMs = CTimer.UnusedNum;
-		this.SystemTimer = new CTimer(CTimer.TimerType.MultiMedia);
-		this.b最初の実出力遅延算出 = true;
+		this.SystemTimer = new CTimer(CTimer.TimerType.GameTimeAtDraw);
 
 		// BASS の設定。
 
@@ -108,17 +124,17 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 
 		if (!Bass.Configure(Configuration.UpdatePeriod, 0)) // 0:BASSストリームの自動更新を行わない。
 		{
-			Trace.TraceWarning($"Configure({nameof(Configuration.UpdatePeriod)}) に失敗しました。[{Bass.LastError.ToString()}]");
+			Trace.TraceWarning($"Configure({nameof(Configuration.UpdatePeriod)}) failed. [{Bass.LastError.ToString()}]");
 		}
 		if (!Bass.Configure(Configuration.UpdateThreads, 0)) // 0:BASSストリームの自動更新を行わない。
 		{
-			Trace.TraceWarning($"Configure({nameof(Configuration.UpdateThreads)}) に失敗しました。[{Bass.LastError.ToString()}]");
+			Trace.TraceWarning($"Configure({nameof(Configuration.UpdateThreads)}) failed. [{Bass.LastError.ToString()}]");
 		}
 
 		// BASS の初期化。
 
-		int nデバイス = 0;      // 0:"no device" … BASS からはデバイスへアクセスさせない。アクセスは BASSWASAPI アドオンから行う。
-		int n周波数 = 44100;   // 仮決め。lデバイス（≠ドライバ）がネイティブに対応している周波数であれば何でもいい？ようだ。BASSWASAPIでデバイスの周波数は変えられる。いずれにしろBASSMXで自動的にリサンプリングされる。
+		int nDevice = 0;      // 0:"no device" … BASS からはデバイスへアクセスさせない。アクセスは BASSWASAPI アドオンから行う。
+		int nFrequency = 44100;   // 仮決め。lデバイス（≠ドライバ）がネイティブに対応している周波数であれば何でもいい？ようだ。BASSWASAPIでデバイスの周波数は変えられる。いずれにしろBASSMXで自動的にリサンプリングされる。
 							//if( !Bass.Init( nデバイス, n周波数, DeviceInitFlags.Default, IntPtr.Zero ) )
 							//	throw new Exception( string.Format( "BASS (WASAPI) の初期化に失敗しました。(BASS_Init)[{0}]", Bass.LastError.ToString() ) );
 
@@ -128,7 +144,7 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 		//(デバッグ用)
 		Trace.TraceInformation("サウンドデバイス一覧:");
 		int a;
-		string strDefaultSoundDeviceName = null;
+		string? strDefaultSoundDeviceName = null;
 		DeviceInfo[] bassDevInfos = new DeviceInfo[Bass.DeviceCount];
 		for (int j = 0; j < bassDevInfos.Length; j++) {
 			bassDevInfos[j] = Bass.GetDeviceInfo(j);
@@ -151,10 +167,9 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 
 		// BASS WASAPI の初期化。
 
-		nデバイス = -1;
-		n周波数 = 0;           // デフォルトデバイスの周波数 (0="mix format" sample rate)
-		int nチャンネル数 = 0;    // デフォルトデバイスのチャンネル数 (0="mix format" channels)
-		this.tWasapiProc = new WasapiProcedure(this.tWASAPI処理);     // アンマネージに渡す delegate は、フィールドとして保持しておかないとGCでアドレスが変わってしまう。
+		nDevice = -1;
+		nFrequency = 0;           // デフォルトデバイスの周波数 (0="mix format" sample rate)
+		int nChannelCount = 0;    // デフォルトデバイスのチャンネル数 (0="mix format" channels)
 
 		// WASAPIの更新間隔(period)は、バッファサイズにも影響を与える。
 		// 更新間隔を最小にするには、BassWasapi.BASS_WASAPI_GetDeviceInfo( ndevNo ).minperiod の値を使えばよい。
@@ -184,7 +199,7 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 		}
 		if (nDevNo != -1) {
 			Trace.TraceInformation("Start Bass_Init(device=0(fixed value: no sound), deviceInfo.mixfreq=" + deviceInfo.MixFrequency + ", BASS_DEVICE_DEFAULT, Zero)");
-			if (!Bass.Init(0, deviceInfo.MixFrequency, DeviceInitFlags.Default, IntPtr.Zero))  // device = 0:"no device": BASS からはデバイスへアクセスさせない。アクセスは BASSWASAPI アドオンから行う。
+			if (!Bass.Init(0, deviceInfo.MixFrequency, DeviceInitFlags.Latency, IntPtr.Zero))  // device = 0:"no device": BASS からはデバイスへアクセスさせない。アクセスは BASSWASAPI アドオンから行う。
 				throw new Exception(string.Format("BASS (WASAPI{0}) の初期化に失敗しました。(BASS_Init)[{1}]", mode.ToString(), Bass.LastError.ToString()));
 
 			// Trace.TraceInformation( "Selected Default WASAPI Device: {0}", deviceInfo.name );
@@ -207,7 +222,22 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 		var flags = (mode == EWASAPIMode.Exclusion) ? WasapiInitFlags.AutoFormat | WasapiInitFlags.Exclusive : WasapiInitFlags.Shared | WasapiInitFlags.AutoFormat;
 		//var flags = ( mode == Eデバイスモード.排他 ) ? BASSWASAPIInit.BASS_WASAPI_AUTOFORMAT | BASSWASAPIInit.BASS_WASAPI_EVENT | BASSWASAPIInit.BASS_WASAPI_EXCLUSIVE : BASSWASAPIInit.BASS_WASAPI_AUTOFORMAT | BASSWASAPIInit.BASS_WASAPI_EVENT;
 
-		if (BassWasapi.Init(nデバイス, n周波数, nチャンネル数, flags, (bufferSize / 1000.0f), (interval / 1000.0f), this.tWasapiProc, IntPtr.Zero)) {
+		// BASS feeds the device from hMixer_DeviceOut itself (WASAPIPROC_BASS), so no C# runs on the audio thread.
+		// The mixers come first, in the device's mix format. A device that takes another format gets them again in
+		// that one, since the clock counts bytes in the mixer's format.
+		int nMixFrequency = deviceInfo.MixFrequency > 0 ? deviceInfo.MixFrequency : 48000;
+		int nMixChannels = deviceInfo.MixChannels > 0 ? deviceInfo.MixChannels : 2;
+		this.tCreateMixers(nMixFrequency, nMixChannels);
+		bool bInitialized = BassWasapi.InitEx(nDevice, nFrequency, nChannelCount, flags, (bufferSize / 1000.0f), (interval / 1000.0f), BassWasapi.WasapiProc_Bass, new IntPtr(this.hMixer_DeviceOut));
+		if (bInitialized && BassWasapi.GetInfo(out var deviceFormat) && (deviceFormat.Frequency != nMixFrequency || deviceFormat.Channels != nMixChannels)) {
+			BassWasapi.Free();
+			Bass.StreamFree(this.hMixer_DeviceOut);
+			Bass.StreamFree(this.hMixer);
+			this.tCreateMixers(deviceFormat.Frequency, deviceFormat.Channels);
+			bInitialized = BassWasapi.InitEx(nDevice, nFrequency, nChannelCount, flags, (bufferSize / 1000.0f), (interval / 1000.0f), BassWasapi.WasapiProc_Bass, new IntPtr(this.hMixer_DeviceOut));
+		}
+
+		if (bInitialized) {
 			if (mode == EWASAPIMode.Exclusion) {
 				#region [ 排他モードで作成成功。]
 				//-----------------
@@ -216,19 +246,18 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 				nDevNo = BassWasapi.CurrentDevice;
 				deviceInfo = BassWasapi.GetDeviceInfo(nDevNo);
 				BassWasapi.GetInfo(out var wasapiInfo);
-				int n1サンプルのバイト数 = 2 * wasapiInfo.Channels;  // default;
+				int n1SampleByteCount = 2 * wasapiInfo.Channels;  // default;
 				switch (wasapiInfo.Format)      // BASS WASAPI で扱うサンプルはすべて 32bit float で固定されているが、デバイスはそうとは限らない。
 				{
-					case WasapiFormat.Bit8: n1サンプルのバイト数 = 1 * wasapiInfo.Channels; break;
-					case WasapiFormat.Bit16: n1サンプルのバイト数 = 2 * wasapiInfo.Channels; break;
-					case WasapiFormat.Bit24: n1サンプルのバイト数 = 3 * wasapiInfo.Channels; break;
-					case WasapiFormat.Bit32: n1サンプルのバイト数 = 4 * wasapiInfo.Channels; break;
-					case WasapiFormat.Float: n1サンプルのバイト数 = 4 * wasapiInfo.Channels; break;
+					case WasapiFormat.Bit8: n1SampleByteCount = 1 * wasapiInfo.Channels; break;
+					case WasapiFormat.Bit16: n1SampleByteCount = 2 * wasapiInfo.Channels; break;
+					case WasapiFormat.Bit24: n1SampleByteCount = 3 * wasapiInfo.Channels; break;
+					case WasapiFormat.Bit32: n1SampleByteCount = 4 * wasapiInfo.Channels; break;
+					case WasapiFormat.Float: n1SampleByteCount = 4 * wasapiInfo.Channels; break;
 					case WasapiFormat.Unknown: throw new ArgumentOutOfRangeException($"WASAPI format error ({wasapiInfo.ToString()})");
 				}
-				int n1秒のバイト数 = n1サンプルのバイト数 * wasapiInfo.Frequency;
-				this.BufferSize = (long)(wasapiInfo.BufferLength * 1000.0f / n1秒のバイト数);
-				this.OutputDelay = 0;   // 初期値はゼロ
+				int n1SecondByteCount = n1SampleByteCount * wasapiInfo.Frequency;
+				this.BufferSize = (long)(wasapiInfo.BufferLength * 1000.0f / n1SecondByteCount);
 				Trace.TraceInformation("使用デバイス: #" + nDevNo + " : " + deviceInfo.Name);
 				Trace.TraceInformation("BASS を初期化しました。(WASAPI排他モード, {0}Hz, {1}ch, フォーマット:{2}, バッファ{3}bytes [{4}ms(希望{5}ms)], 更新間隔{6}ms)",
 					wasapiInfo.Frequency,
@@ -249,20 +278,18 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 
 				var devInfo = BassWasapi.GetDeviceInfo(BassWasapi.CurrentDevice);
 				BassWasapi.GetInfo(out var wasapiInfo);
-				int n1サンプルのバイト数 = 2 * wasapiInfo.Channels; // default;
+				int n1SampleByteCount = 2 * wasapiInfo.Channels; // default;
 				switch (wasapiInfo.Format)      // BASS WASAPI で扱うサンプルはすべて 32bit float で固定されているが、デバイスはそうとは限らない。
 				{
-					case WasapiFormat.Bit8: n1サンプルのバイト数 = 1 * wasapiInfo.Channels; break;
-					case WasapiFormat.Bit16: n1サンプルのバイト数 = 2 * wasapiInfo.Channels; break;
-					case WasapiFormat.Bit24: n1サンプルのバイト数 = 3 * wasapiInfo.Channels; break;
-					case WasapiFormat.Bit32: n1サンプルのバイト数 = 4 * wasapiInfo.Channels; break;
-					case WasapiFormat.Float: n1サンプルのバイト数 = 4 * wasapiInfo.Channels; break;
+					case WasapiFormat.Bit8: n1SampleByteCount = 1 * wasapiInfo.Channels; break;
+					case WasapiFormat.Bit16: n1SampleByteCount = 2 * wasapiInfo.Channels; break;
+					case WasapiFormat.Bit24: n1SampleByteCount = 3 * wasapiInfo.Channels; break;
+					case WasapiFormat.Bit32: n1SampleByteCount = 4 * wasapiInfo.Channels; break;
+					case WasapiFormat.Float: n1SampleByteCount = 4 * wasapiInfo.Channels; break;
 					case WasapiFormat.Unknown: throw new ArgumentOutOfRangeException($"WASAPI format error ({wasapiInfo.ToString()})");
 				}
-				int n1秒のバイト数 = n1サンプルのバイト数 * wasapiInfo.Frequency;
-				this.BufferSize = (long)(wasapiInfo.BufferLength * 1000.0f / n1秒のバイト数);
-
-				this.OutputDelay = 0;   // 初期値はゼロ
+				int n1SecondByteCount = n1SampleByteCount * wasapiInfo.Frequency;
+				this.BufferSize = (long)(wasapiInfo.BufferLength * 1000.0f / n1SecondByteCount);
 
 				Trace.TraceInformation("BASS を初期化しました。(WASAPI共有モード, {0}ms, 更新間隔{1}ms)", bufferSize, devInfo.DefaultUpdatePeriod * 1000.0f);
 				this.bIsBASSFree = false;
@@ -287,26 +314,28 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 			#region [ それでも失敗したら例外発生。]
 			//-----------------
 			Errors errcode = Bass.LastError;
-			Bass.Free();
-			this.bIsBASSFree = true;
+			this.tFreeBass();
 			throw new Exception(string.Format("BASS (WASAPI) の初期化に失敗しました。(BASS_WASAPI_Init)[{0}]", errcode));
 			//-----------------
 			#endregion
 		}
 
 
-		// WASAPI出力と同じフォーマットを持つ BASS ミキサーを作成。
+		// 出力を開始。
 
-		BassWasapi.GetInfo(out var info);
+		BassWasapi.Start();
+		this.bStarted = true;
+	}
+
+	// WASAPI出力と同じフォーマットを持つ BASS ミキサーを作成。
+	private void tCreateMixers(int frequency, int channels) {
 		this.hMixer = BassMix.CreateMixerStream(
-			info.Frequency,
-			info.Channels,
+			frequency,
+			channels,
 			BassFlags.MixerNonStop | BassFlags.Float | BassFlags.Decode);   // デコードのみ＝発声しない。WASAPIに出力されるだけ。
 		if (this.hMixer == 0) {
 			Errors errcode = Bass.LastError;
-			BassWasapi.Free();
-			Bass.Free();
-			this.bIsBASSFree = true;
+			this.tFreeBass();
 			throw new Exception(string.Format("BASSミキサ(mixing)の作成に失敗しました。[{0}]", errcode));
 		}
 
@@ -314,8 +343,8 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 		// BASS ミキサーの1秒あたりのバイト数を算出。
 
 		var mixerInfo = Bass.ChannelGetInfo(this.hMixer);
-		long nミキサーの1サンプルあたりのバイト数 = mixerInfo.Channels * 4;  // 4 = sizeof(FLOAT)
-		this.nミキサーの1秒あたりのバイト数 = nミキサーの1サンプルあたりのバイト数 * mixerInfo.Frequency;
+		long nMixer1SamplePerByteCount = mixerInfo.Channels * 4;  // 4 = sizeof(FLOAT)
+		this.nBytesPerSec = nMixer1SamplePerByteCount * mixerInfo.Frequency;
 
 
 
@@ -324,14 +353,12 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 		// そのため、もう一段mixerを噛ませて、一段先のmixerからChannelGetData()することで、
 		// hMixerの音量制御を反映させる。
 		this.hMixer_DeviceOut = BassMix.CreateMixerStream(
-			info.Frequency,
-			info.Channels,
+			frequency,
+			channels,
 			BassFlags.MixerNonStop | BassFlags.Float | BassFlags.Decode);   // デコードのみ＝発声しない。WASAPIに出力されるだけ。
 		if (this.hMixer_DeviceOut == 0) {
 			Errors errcode = Bass.LastError;
-			BassWasapi.Free();
-			Bass.Free();
-			this.bIsBASSFree = true;
+			this.tFreeBass();
 			throw new Exception(string.Format("BASSミキサ(最終段)の作成に失敗しました。[{0}]", errcode));
 		}
 
@@ -339,27 +366,37 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 			bool b1 = BassMix.MixerAddChannel(this.hMixer_DeviceOut, this.hMixer, BassFlags.Default);
 			if (!b1) {
 				Errors errcode = Bass.LastError;
-				BassWasapi.Free();
-				Bass.Free();
-				this.bIsBASSFree = true;
+				this.tFreeBass();
 				throw new Exception(string.Format("BASSミキサ(最終段とmixing)の接続に失敗しました。[{0}]", errcode));
 			};
 		}
+	}
 
-
-		// 出力を開始。
-
-		BassWasapi.Start();
+	// the streams go with BASS, so their handles go too: Dispose must not free them again
+	private void tFreeBass() {
+		Bass.Free();
+		this.hMixer = this.hMixer_DeviceOut = -1;
+		this.bIsBASSFree = true;
 	}
 	#region [ tサウンドを作成する() ]
-	public CSound tCreateSound(string strファイル名, ESoundGroup soundGroup) {
+	public CSound tCreateSound(string strFileName, ESoundGroup soundGroup) {
 		var sound = new CSound(soundGroup);
-		sound.CreateWASAPISound(strファイル名, this.hMixer, this.SoundDeviceType);
+		sound.CreateWASAPISound(strFileName, this.hMixer, this.SoundDeviceType);
 		return sound;
 	}
 
-	public void tCreateSound(string strファイル名, CSound sound) {
-		sound.CreateWASAPISound(strファイル名, this.hMixer, this.SoundDeviceType);
+	public void tCreateSound(string strFileName, CSound sound) {
+		sound.CreateWASAPISound(strFileName, this.hMixer, this.SoundDeviceType);
+	}
+
+	public CSound tCreateUserSound(int frequency, int channels, double durationSeconds, StreamProcedure proc, ESoundGroup soundGroup) {
+		var sound = new CSound(soundGroup);
+		sound.CreateBassUserSound(frequency, channels, durationSeconds, this.hMixer, proc, this.SoundDeviceType, SoundManager.bIsTimeStretch);
+		return sound;
+	}
+
+	public void tCreateUserSound(int frequency, int channels, double durationSeconds, StreamProcedure proc, CSound sound) {
+		sound.CreateBassUserSound(frequency, channels, durationSeconds, this.hMixer, proc, this.SoundDeviceType, SoundManager.bIsTimeStretch);
 	}
 	#endregion
 
@@ -371,16 +408,17 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 	}
 	protected void Dispose(bool bManagedDispose) {
 		SoundDeviceType = ESoundDeviceType.Unknown;     // まず出力停止する(Dispose中にクラス内にアクセスされることを防ぐ)
+		lock (this.clockLock) this.bStarted = false;    // the clock reads no more of the device or of the system timer
 		if (hMixer != -1) {
 			Bass.StreamFree(hMixer);
 		}
 		if (!bIsBASSFree) {
-			BassWasapi.Free();  // システムタイマより先に呼び出すこと。（tWasapi処理() の中でシステムタイマを参照してるため）
+			BassWasapi.Free();
 			Bass.Free();
 		}
 		if (bManagedDispose) {
 			SystemTimer.Dispose();
-			SystemTimer = null;
+			SystemTimer = null!;
 		}
 	}
 	~CSoundDeviceWASAPI() {
@@ -391,38 +429,29 @@ internal class CSoundDeviceWASAPI : ISoundDevice {
 
 	protected int hMixer = -1;
 	protected int hMixer_DeviceOut = -1;
-	protected WasapiProcedure tWasapiProc = null;
 
-	protected int tWASAPI処理(IntPtr buffer, int length, IntPtr user) {
-		// BASSミキサからの出力データをそのまま WASAPI buffer へ丸投げ。
-
-		int num = Bass.ChannelGetData(this.hMixer_DeviceOut, buffer, length);       // num = 実際に転送した長さ
-		if (num == -1) num = 0;
-
-
-		// 経過時間を更新。
-		// データの転送差分ではなく累積転送バイト数から算出する。
-
-		int n未再生バイト数 = BassWasapi.GetData(null, (int)DataFlags.Available);  // 誤差削減のため、必要となるギリギリ直前に取得する。
-		this.ElapsedTimeMs = (this.n累積転送バイト数 - n未再生バイト数) * 1000 / this.nミキサーの1秒あたりのバイト数;
-		this.UpdateSystemTimeMs = this.SystemTimer.SystemTimeMs;
-
-		// 実出力遅延を更新。
-		// 未再生バイト数の平均値。
-
-		long n今回の遅延ms = n未再生バイト数 * 1000 / this.nミキサーの1秒あたりのバイト数;
-		this.OutputDelay = (this.b最初の実出力遅延算出) ? n今回の遅延ms : (this.OutputDelay + n今回の遅延ms) / 2;
-		this.b最初の実出力遅延算出 = false;
-
-
-		// 経過時間を更新後に、今回分の累積転送バイト数を反映。
-
-		this.n累積転送バイト数 += num;
-		return num;
+	// The clock is read when asked: what the device took from the mixer, less what it has not played yet. The stamp
+	// moves only with that count, so once the output stops, it tells since when it is silent.
+	private void tReadClock() {
+		lock (this.clockLock) {
+			if (!this.bStarted) return;
+			long nPulledBytes = Bass.ChannelGetPosition(this.hMixer_DeviceOut);
+			if (nPulledBytes < 0) return;
+			int nUnplayed = BassWasapi.GetData(null, (int)DataFlags.Available);
+			if (nUnplayed >= 0) this.nUnplayedBytes = nUnplayed;   // else the last count read
+			double played = (nPulledBytes - this.nUnplayedBytes) * 1000.0 / this.nBytesPerSec;
+			if (this.msUpdateSystemTime == CTimer.UnusedNum || played > this.msPlayed) {
+				this.msPlayed = played;
+				this.msUpdateSystemTime = this.SystemTimer.SystemTimeMs;
+				this.dbmsUpdateSystemTime = this.SystemTimer.SystemTimeMs_Double;
+			}
+		}
 	}
-
-	private long nミキサーの1秒あたりのバイト数 = 0;
-	private long n累積転送バイト数 = 0;
-	private bool b最初の実出力遅延算出 = true;
+	private readonly object clockLock = new();
+	private bool bStarted = false;
+	private double msPlayed = 0;
+	private long nUnplayedBytes = 0;
+	private long msUpdateSystemTime = CTimer.UnusedNum;
+	private double dbmsUpdateSystemTime = CTimer.UnusedNum;
 	private bool bIsBASSFree = true;
 }

@@ -2,39 +2,17 @@
 
 namespace OpenTaiko;
 
-internal class CActFIFOResult : CActivity {
+internal class CActFIFOResult : CActFIFOBase {
 	// メソッド
 
-	public void tフェードアウト開始() {
-		this.mode = EFIFOMode.FadeOut;
-		this.counter = new CCounter(0, 100, 30, OpenTaiko.Timer);
-	}
-	public void tフェードイン開始() {
-		this.mode = EFIFOMode.FadeIn;
-		this.counter = new CCounter(0, 300, 2, OpenTaiko.Timer);
-	}
-	public void tフェードイン完了() {
-		this.counter.CurrentValue = (int)counter.BeginValue;
-	}
-
+	public override void tFadeOutStart(int? start = null, int? end = null, int? interval = null)
+		=> base.StartFadeOutCounter(start ?? 0, end ?? 100, interval ?? 30);
+	public override void tFadeInStart(int? start = null, int? end = null, int? interval = null)
+		=> base.StartFadeInCounter(start ?? 0, end ?? 300, interval ?? 2);
 
 	// CActivity 実装
 
-	public override void DeActivate() {
-		if (!base.IsDeActivated) {
-			//CDTXMania.tテクスチャの解放( ref this.tx黒タイル64x64 );
-			base.DeActivate();
-		}
-	}
-	public override void CreateManagedResource() {
-		//this.tx黒タイル64x64 = CDTXMania.tテクスチャの生成( CSkin.Path( @"Graphics\Tile black 64x64.png" ), false );
-		base.CreateManagedResource();
-	}
-	public override int Draw() {
-		if (base.IsDeActivated || (this.counter == null)) {
-			return 0;
-		}
-		this.counter.Tick();
+	public override int DrawSub() {
 		// Size clientSize = CDTXMania.app.Window.ClientSize;	// #23510 2010.10.31 yyagi: delete as of no one use this any longer.
 		if (OpenTaiko.Tx.Tile_Black != null) {
 			if (this.mode == EFIFOMode.FadeIn) {
@@ -51,30 +29,10 @@ internal class CActFIFOResult : CActivity {
 			{
 				for (int j = 0; j <= (GameWindowSize.Height / OpenTaiko.Tx.Tile_Black.szTextureSize.Height); j++) // #23510 2010.10.31 yyagi: change "clientSize.Height" to "480" to fix FIFO drawing size
 				{
-					OpenTaiko.Tx.Tile_Black.t2D描画(i * OpenTaiko.Tx.Tile_Black.szTextureSize.Width, j * OpenTaiko.Tx.Tile_Black.szTextureSize.Height);
+					OpenTaiko.Tx.Tile_Black.t2DDraw(i * OpenTaiko.Tx.Tile_Black.szTextureSize.Width, j * OpenTaiko.Tx.Tile_Black.szTextureSize.Height);
 				}
 			}
 		}
-		if (this.mode == EFIFOMode.FadeOut) {
-			if (this.counter.CurrentValue != 100) {
-				return 0;
-			}
-		} else {
-			if (this.counter.CurrentValue != 300) {
-				return 0;
-			}
-		}
-		return 1;
+		return 0;
 	}
-
-
-	// その他
-
-	#region [ private ]
-	//-----------------
-	private CCounter counter;
-	private EFIFOMode mode;
-	//private CTexture tx黒タイル64x64;
-	//-----------------
-	#endregion
 }

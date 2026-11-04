@@ -10,19 +10,16 @@ class DBCharacter {
 			FuseRollFactor = 0;
 		}
 
-		public float GetCoinMultiplier() {
-			float mult = 1f;
+		public float GetCoinMultiplier(float multRarity, bool gaugeEnabled = true, bool bombFactorEnabled = true, bool fuseRollFactorEnabled = true) {
+			if (gaugeEnabled)
+				multRarity *= HGaugeMethods.GetCoinMultiplier(Gauge);
 
-			if (Gauge == "Hard" && !OpenTaiko.ConfigIni.bForceNormalGauge) mult *= 1.5f;
-			if (Gauge == "Extreme" && !OpenTaiko.ConfigIni.bForceNormalGauge) mult *= 1.8f;
-
-			return mult;
+			return multRarity;
 		}
 
 		public string tGetGaugeType() {
-			return OpenTaiko.ConfigIni.bForceNormalGauge || OpenTaiko.stageSongSelect.nChoosenSongDifficulty[0] >= 5 ? "Normal" : Gauge;
+			return HGaugeMethods.IsForceNormalGauge() ? "Normal" : Gauge;
 		}
-
 
 		[JsonProperty("gauge")]
 		public string Gauge;
@@ -83,7 +80,7 @@ class DBCharacter {
 		// String or CLocalizationData
 		[JsonProperty("description")]
 		[JsonConverter(typeof(LocalizedStringConverter<CLocalizationData>))]
-		public object Description;
+		public object? Description;
 
 		[JsonProperty("speechtext")]
 		public CLocalizationData[] SpeechText;

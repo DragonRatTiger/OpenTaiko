@@ -1,0 +1,15 @@
+{
+  "_comment": "Spanish texts for the TV (tv.lua): its menu and the cutscene browser. Keys are stable ids; a missing id shows the English text (lang/en).",
+  "title": "TV",
+  "menu_on": "Encender",
+  "menu_off": "Apagar",
+  "menu_rewatch": "Volver a ver cinemáticas",
+  "tab_songs": "Cinemáticas de canciones",
+  "tab_videos": "Videos de partituras",
+  "intro": "Intro",
+  "outro": "Outro %d",
+  "unknown_song": "???",
+  "empty": "No se encontraron cinemáticas.",
+  "empty_videos": "No se encontraron videos de partituras.",
+  "waiting": "Sintonizando los canales... la lista de canciones aún se está preparando."
+}

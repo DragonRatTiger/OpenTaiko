@@ -4,6 +4,10 @@ namespace OpenTaiko;
 
 public class CStage : CActivity {
 	internal EStage eStageID;
+
+	// Only used if eStageID is EStage.CUSTOM
+	internal string? customStageName;
+
 	public enum EStage {
 		None,
 		StartUp,
@@ -16,12 +20,11 @@ public class CStage : CActivity {
 		Game,
 		Results,
 		ChangeSkin,                     // #28195 2011.5.4 yyagi
-		Heya,
+		Transition,                     // smooth stage→stage fade + loading screen (CStageTransition)
 		TaikoTowers,
 		BoukenTitle,
 		BoukenMap,
 		OnlineLounge,
-		Encyclopedia,
 		AIBattleMode,
 		PlayerStats,
 		ChartEditor,
@@ -52,14 +55,18 @@ public class CStage : CActivity {
 		SongSelect_FadeOutToCourseSelect, //2016.10.20 kairera0467
 		SongSelect_FadeOutToNowLoading,
 		SongLoading_LoadDTXFile,
+		SongLoading_WaitDTXLoaded,
 		SongLoading_WaitToLoadWAVFile,
 		SongLoading_LoadWAVFile,
+		SongLoading_WaitWAVLoaded,
 		SongLoading_LoadBMPFile,
+		SongLoading_StreamTextures,
 		SongLoading_WaitForSoundSystemBGM,
 		Game_STAGE_FAILED,
-		Game_STAGE_FAILED_FadeOut,
-		Game_STAGE_CLEAR_FadeOut,
+		Game_EndChart,
 		Game_EndStage, //2016.07.15 kairera0467
+		Game_EndStage_FadeOut,
+		Game_EndStage_Quit_FadeOut,
 		Game_Reload
 	}
 }

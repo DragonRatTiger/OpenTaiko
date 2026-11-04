@@ -7,10 +7,11 @@ namespace OpenTaiko;
 /// and song play stages when handling keyboard input. By delegating to
 /// this class they are able to support a centrally-managed and consistent
 /// set of keyboard shortcuts for dynamically adjusting four sound group
-/// levels:
+/// levels (the volume keys are [ and ] by default):
 /// - sound effect level, via Ctrl and either of the Minus or Equals keys
 /// - voice level, via Shift and either of the Minus or Equals keys
-/// - song preview and song playback level, via the Minus or Equals key
+/// - song playback level, via Alt and the volume keys
+/// - master level, via the volume keys alone
 ///
 /// When the sound group levels are adjusted in this manner, the
 /// SoundGroupLevelController (and handlers bound to its events) ensure
@@ -24,27 +25,30 @@ internal static class KeyboardSoundGroupLevelControlHandler {
 		SoundGroupLevelController soundGroupLevelController,
 		CSkin skin,
 		bool isSongPreview) {
-		bool isAdjustmentPositive = OpenTaiko.ConfigIni.KeyAssign.KeyIsPressed(OpenTaiko.ConfigIni.KeyAssign.System.SongVolIncrease);
-		bool isAdjustmentNegative = OpenTaiko.ConfigIni.KeyAssign.KeyIsPressed(OpenTaiko.ConfigIni.KeyAssign.System.SongVolDecrease);
+		bool isAdjustmentPositive = OpenTaiko.ConfigIni.KeyAssign.System.SongVolIncrease.IsPressed();
+		bool isAdjustmentNegative = OpenTaiko.ConfigIni.KeyAssign.System.SongVolDecrease.IsPressed();
 
 		if (!(isAdjustmentPositive || isAdjustmentNegative)) return;
 
 		ESoundGroup soundGroup;
-		CSkin.CSystemSound システムサウンド = null;
+		CSkin.CSystemSound? SystemSound = null;
 
 		if (keyboard.KeyPressing((int)SlimDXKeys.Key.LeftControl) ||
 			keyboard.KeyPressing((int)SlimDXKeys.Key.RightControl)) {
 			soundGroup = ESoundGroup.SoundEffect;
-			システムサウンド = skin.soundDecideSFX;
+			SystemSound = skin.soundDecideSFX;
 		} else if (keyboard.KeyPressing((int)SlimDXKeys.Key.LeftShift) ||
 				   keyboard.KeyPressing((int)SlimDXKeys.Key.RightShift)) {
 			soundGroup = ESoundGroup.Voice;
-			システムサウンド = skin.soundゲーム開始音;
-		} else {
+			SystemSound = skin.soundGameStartSound;
+		} else if (keyboard.KeyPressing((int)SlimDXKeys.Key.LeftAlt) ||
+				   keyboard.KeyPressing((int)SlimDXKeys.Key.RightAlt)) {
 			soundGroup = ESoundGroup.SongPlayback;
+		} else {
+			soundGroup = ESoundGroup.Master;
 		}
 
 		soundGroupLevelController.AdjustLevel(soundGroup, isAdjustmentPositive);
-		システムサウンド?.tPlay();
+		SystemSound?.tPlay();
 	}
 }

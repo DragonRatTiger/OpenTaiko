@@ -15,17 +15,17 @@ internal class CActImplMtaiko : CActivity {
 
 	public override void Activate() {
 		for (int i = 0; i < 25; i++) {
-			STパッド状態 stパッド状態 = new STパッド状態();
-			stパッド状態.n明るさ = 0;
-			this.stパッド状態[i] = stパッド状態;
+			STPadState stPadState = new STPadState();
+			stPadState.nBrightness = 0;
+			this.stPadState[i / 5, i % 5] = stPadState;
 		}
 
-		this.ctレベルアップダウン = new CCounter[5];
+		this.ctLevelUpDown = new CCounter[5];
 		ctSymbolFlash = new CCounter[5];
 		this.After = new CTja.ECourse[5];
 		this.Before = new CTja.ECourse[5];
 		for (int i = 0; i < 5; i++) {
-			this.ctレベルアップダウン[i] = new CCounter();
+			this.ctLevelUpDown[i] = new CCounter();
 			BackSymbolEvent(i);
 		}
 
@@ -33,7 +33,7 @@ internal class CActImplMtaiko : CActivity {
 	}
 
 	public override void DeActivate() {
-		this.ctレベルアップダウン = null;
+		this.ctLevelUpDown = null;
 
 		base.DeActivate();
 	}
@@ -48,21 +48,21 @@ internal class CActImplMtaiko : CActivity {
 
 	public override int Draw() {
 		if (base.IsFirstDraw) {
-			this.nフラッシュ制御タイマ = SoundManager.PlayTimer.NowTimeMs;
+			this.nFlashControlTimer = SoundManager.PlayTimer.NowTimeMs;
 			base.IsFirstDraw = false;
 		}
 
 		long num = SoundManager.PlayTimer.NowTimeMs;
-		if (num < this.nフラッシュ制御タイマ) {
-			this.nフラッシュ制御タイマ = num;
+		if (num < this.nFlashControlTimer) {
+			this.nFlashControlTimer = num;
 		}
-		while ((num - this.nフラッシュ制御タイマ) >= 20) {
+		while ((num - this.nFlashControlTimer) >= 20) {
 			for (int j = 0; j < 25; j++) {
-				if (this.stパッド状態[j].n明るさ > 0) {
-					this.stパッド状態[j].n明るさ--;
+				if (this.stPadState[j / 5, j % 5].nBrightness > 0) {
+					this.stPadState[j / 5, j % 5].nBrightness--;
 				}
 			}
-			this.nフラッシュ制御タイマ += 20;
+			this.nFlashControlTimer += 20;
 		}
 
 
@@ -84,11 +84,11 @@ internal class CActImplMtaiko : CActivity {
 				bg_y = OpenTaiko.Skin.Game_Taiko_Background_Y[i];
 			}
 
-			CTexture tex = null;
+			CTexture? tex = null;
 
 			switch (i) {
 				case 0: {
-						if (OpenTaiko.stageSongSelect.nChoosenSongDifficulty[0] == (int)Difficulty.Dan) {
+						if (OpenTaiko.SongMount.nChoosenSongDifficulty[0] == (int)Difficulty.Dan) {
 							tex = OpenTaiko.Tx.Taiko_Background[2];
 						} else if (OpenTaiko.ConfigIni.bTokkunMode) {
 							if (OpenTaiko.P1IsBlue())
@@ -125,8 +125,15 @@ internal class CActImplMtaiko : CActivity {
 					break;
 			}
 
-			tex?.t2D描画(bg_x, bg_y);
+			tex?.t2DDraw(bg_x, bg_y);
 		}
+
+
+		// 3+-player mode character
+		if (OpenTaiko.ConfigIni.ShowChara && OpenTaiko.ConfigIni.nPlayerCount > 2) {
+			OpenTaiko.stageGameScreen.actChara.Draw();
+		}
+
 		/*
         if (TJAPlayer3.stage選曲.n確定された曲の難易度[0] == (int)Difficulty.Dan)  // Dan-i Dojo
             TJAPlayer3.Tx.Taiko_Background[2]?.t2D描画(bg_x[0], bg_y[0]);
@@ -185,6 +192,11 @@ internal class CActImplMtaiko : CActivity {
 		for (int i = 0; i < OpenTaiko.ConfigIni.nPlayerCount; i++) {
 			int taiko_x;
 			int taiko_y;
+
+			if (OpenTaiko.ConfigIni.nPlayerCount >= 3 && !OpenTaiko.Skin.Game_Taiko_VisibleExPlayerCount) {
+				break;
+			}
+
 			if (OpenTaiko.ConfigIni.nPlayerCount == 5) {
 				taiko_x = OpenTaiko.Skin.Game_Taiko_5P[0] + (OpenTaiko.Skin.Game_UIMove_5P[0] * i);
 				taiko_y = OpenTaiko.Skin.Game_Taiko_5P[1] + (OpenTaiko.Skin.Game_UIMove_5P[1] * i);
@@ -196,35 +208,34 @@ internal class CActImplMtaiko : CActivity {
 				taiko_y = OpenTaiko.Skin.Game_Taiko_Y[i];
 			}
 
-			int _actual = OpenTaiko.GetActualPlayer(i);
-			EGameType _gt = OpenTaiko.ConfigIni.nGameType[_actual];
-			int playerShift = i * 5;
+			int _actual = i;
+			EGameType _gt = OpenTaiko.stageGameScreen.eGameType[_actual];
 
 			// Drum base
-			OpenTaiko.Tx.Taiko_Base[(int)_gt]?.t2D描画(taiko_x, taiko_y);
+			OpenTaiko.Tx.Taiko_Base[(int)_gt]?.t2DDraw(taiko_x, taiko_y);
 
 			// Taiko hits
 			if (_gt == EGameType.Taiko) {
 				if (OpenTaiko.Tx.Taiko_Don_Left != null && OpenTaiko.Tx.Taiko_Don_Right != null && OpenTaiko.Tx.Taiko_Ka_Left != null && OpenTaiko.Tx.Taiko_Ka_Right != null) {
-					OpenTaiko.Tx.Taiko_Ka_Left.Opacity = getMTaikoOpacity(this.stパッド状態[playerShift].n明るさ);
-					OpenTaiko.Tx.Taiko_Ka_Right.Opacity = getMTaikoOpacity(this.stパッド状態[1 + playerShift].n明るさ);
-					OpenTaiko.Tx.Taiko_Don_Left.Opacity = getMTaikoOpacity(this.stパッド状態[2 + playerShift].n明るさ);
-					OpenTaiko.Tx.Taiko_Don_Right.Opacity = getMTaikoOpacity(this.stパッド状態[3 + playerShift].n明るさ);
+					OpenTaiko.Tx.Taiko_Ka_Left.Opacity = getMTaikoOpacity(this.stPadState[i, 0].nBrightness);
+					OpenTaiko.Tx.Taiko_Ka_Right.Opacity = getMTaikoOpacity(this.stPadState[i, 1].nBrightness);
+					OpenTaiko.Tx.Taiko_Don_Left.Opacity = getMTaikoOpacity(this.stPadState[i, 2].nBrightness);
+					OpenTaiko.Tx.Taiko_Don_Right.Opacity = getMTaikoOpacity(this.stPadState[i, 3].nBrightness);
 
-					OpenTaiko.Tx.Taiko_Ka_Left.t2D描画(taiko_x, taiko_y, new Rectangle(0, 0, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Height));
-					OpenTaiko.Tx.Taiko_Ka_Right.t2D描画(taiko_x + OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, taiko_y, new Rectangle(OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, 0, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Height));
-					OpenTaiko.Tx.Taiko_Don_Left.t2D描画(taiko_x, taiko_y, new Rectangle(0, 0, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Height));
-					OpenTaiko.Tx.Taiko_Don_Right.t2D描画(taiko_x + OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, taiko_y, new Rectangle(OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, 0, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Height));
+					OpenTaiko.Tx.Taiko_Ka_Left.t2DDraw(taiko_x, taiko_y, new Rectangle(0, 0, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Height));
+					OpenTaiko.Tx.Taiko_Ka_Right.t2DDraw(taiko_x + OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, taiko_y, new Rectangle(OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, 0, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Height));
+					OpenTaiko.Tx.Taiko_Don_Left.t2DDraw(taiko_x, taiko_y, new Rectangle(0, 0, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Height));
+					OpenTaiko.Tx.Taiko_Don_Right.t2DDraw(taiko_x + OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, taiko_y, new Rectangle(OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, 0, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Width / 2, OpenTaiko.Tx.Taiko_Ka_Right.szTextureSize.Height));
 				}
 			} else if (_gt == EGameType.Konga) {
 				if (OpenTaiko.Tx.Taiko_Konga_Clap != null && OpenTaiko.Tx.Taiko_Konga_Don != null && OpenTaiko.Tx.Taiko_Konga_Ka != null) {
-					OpenTaiko.Tx.Taiko_Konga_Clap.Opacity = getMTaikoOpacity(this.stパッド状態[4 + playerShift].n明るさ);
-					OpenTaiko.Tx.Taiko_Konga_Don.Opacity = getMTaikoOpacity(Math.Max(this.stパッド状態[2 + playerShift].n明るさ, this.stパッド状態[3 + playerShift].n明るさ));
-					OpenTaiko.Tx.Taiko_Konga_Ka.Opacity = getMTaikoOpacity(Math.Max(this.stパッド状態[playerShift].n明るさ, this.stパッド状態[1 + playerShift].n明るさ));
+					OpenTaiko.Tx.Taiko_Konga_Clap.Opacity = getMTaikoOpacity(this.stPadState[i, 4].nBrightness);
+					OpenTaiko.Tx.Taiko_Konga_Don.Opacity = getMTaikoOpacity(Math.Max(this.stPadState[i, 2].nBrightness, this.stPadState[i, 3].nBrightness));
+					OpenTaiko.Tx.Taiko_Konga_Ka.Opacity = getMTaikoOpacity(Math.Max(this.stPadState[i, 0].nBrightness, this.stPadState[i, 1].nBrightness));
 
-					OpenTaiko.Tx.Taiko_Konga_Ka.t2D描画(taiko_x, taiko_y);
-					OpenTaiko.Tx.Taiko_Konga_Don.t2D描画(taiko_x, taiko_y);
-					OpenTaiko.Tx.Taiko_Konga_Clap.t2D描画(taiko_x, taiko_y);
+					OpenTaiko.Tx.Taiko_Konga_Ka.t2DDraw(taiko_x, taiko_y);
+					OpenTaiko.Tx.Taiko_Konga_Don.t2DDraw(taiko_x, taiko_y);
+					OpenTaiko.Tx.Taiko_Konga_Clap.t2DDraw(taiko_x, taiko_y);
 				}
 			}
 
@@ -236,36 +247,36 @@ internal class CActImplMtaiko : CActivity {
 		for (int i = 0; i < OpenTaiko.ConfigIni.nPlayerCount; i++) {
 			if (OpenTaiko.ConfigIni.nPlayerCount > 2 || OpenTaiko.ConfigIni.SimpleMode) break;
 
-			if (!this.ctレベルアップダウン[i].IsStoped) {
-				this.ctレベルアップダウン[i].Tick();
-				if (this.ctレベルアップダウン[i].IsEnded) {
-					this.ctレベルアップダウン[i].Stop();
+			if (!this.ctLevelUpDown![i].IsStopped) {
+				this.ctLevelUpDown[i].Tick();
+				if (this.ctLevelUpDown[i].IsEnded) {
+					this.ctLevelUpDown[i].Stop();
 					this.Before[i] = this.After[i];
 				}
 			}
-			if ((this.ctレベルアップダウン[i].IsTicked && (OpenTaiko.Tx.Taiko_LevelUp != null && OpenTaiko.Tx.Taiko_LevelDown != null)) && !OpenTaiko.ConfigIni.bNoInfo) {
+			if ((this.ctLevelUpDown[i].IsTicked && (OpenTaiko.Tx.Taiko_LevelUp != null && OpenTaiko.Tx.Taiko_LevelDown != null)) && !OpenTaiko.ConfigIni.bNoInfo) {
 				//this.ctレベルアップダウン[ i ].n現在の値 = 110;
 
 				//2017.08.21 kairera0467 t3D描画に変更。
 				float fScale = 1.0f;
 				int nAlpha = 255;
 				float[] fY = new float[] { 206, -206, 0, 0 };
-				if (this.ctレベルアップダウン[i].CurrentValue >= 0 && this.ctレベルアップダウン[i].CurrentValue <= 20) {
+				if (this.ctLevelUpDown[i].CurrentValue >= 0 && this.ctLevelUpDown[i].CurrentValue <= 20) {
 					nAlpha = 60;
 					fScale = 1.14f;
-				} else if (this.ctレベルアップダウン[i].CurrentValue >= 21 && this.ctレベルアップダウン[i].CurrentValue <= 40) {
+				} else if (this.ctLevelUpDown[i].CurrentValue >= 21 && this.ctLevelUpDown[i].CurrentValue <= 40) {
 					nAlpha = 60;
 					fScale = 1.19f;
-				} else if (this.ctレベルアップダウン[i].CurrentValue >= 41 && this.ctレベルアップダウン[i].CurrentValue <= 60) {
+				} else if (this.ctLevelUpDown[i].CurrentValue >= 41 && this.ctLevelUpDown[i].CurrentValue <= 60) {
 					nAlpha = 220;
 					fScale = 1.23f;
-				} else if (this.ctレベルアップダウン[i].CurrentValue >= 61 && this.ctレベルアップダウン[i].CurrentValue <= 80) {
+				} else if (this.ctLevelUpDown[i].CurrentValue >= 61 && this.ctLevelUpDown[i].CurrentValue <= 80) {
 					nAlpha = 230;
 					fScale = 1.19f;
-				} else if (this.ctレベルアップダウン[i].CurrentValue >= 81 && this.ctレベルアップダウン[i].CurrentValue <= 100) {
+				} else if (this.ctLevelUpDown[i].CurrentValue >= 81 && this.ctLevelUpDown[i].CurrentValue <= 100) {
 					nAlpha = 240;
 					fScale = 1.14f;
-				} else if (this.ctレベルアップダウン[i].CurrentValue >= 101 && this.ctレベルアップダウン[i].CurrentValue <= 120) {
+				} else if (this.ctLevelUpDown[i].CurrentValue >= 101 && this.ctLevelUpDown[i].CurrentValue <= 120) {
 					nAlpha = 255;
 					fScale = 1.04f;
 				} else {
@@ -283,13 +294,13 @@ internal class CActImplMtaiko : CActivity {
 					OpenTaiko.Tx.Taiko_LevelUp.vcScaleRatio.X = fScale;
 					OpenTaiko.Tx.Taiko_LevelUp.vcScaleRatio.Y = fScale;
 					OpenTaiko.Tx.Taiko_LevelUp.Opacity = nAlpha;
-					OpenTaiko.Tx.Taiko_LevelUp.t2D拡大率考慮中央基準描画(levelChange_x,
+					OpenTaiko.Tx.Taiko_LevelUp.t2DScaledCenterBasedDraw(levelChange_x,
 						levelChange_y);
 				} else {
 					OpenTaiko.Tx.Taiko_LevelDown.vcScaleRatio.X = fScale;
 					OpenTaiko.Tx.Taiko_LevelDown.vcScaleRatio.Y = fScale;
 					OpenTaiko.Tx.Taiko_LevelDown.Opacity = nAlpha;
-					OpenTaiko.Tx.Taiko_LevelDown.t2D拡大率考慮中央基準描画(levelChange_x,
+					OpenTaiko.Tx.Taiko_LevelDown.t2DScaledCenterBasedDraw(levelChange_x,
 						levelChange_y);
 				}
 			}
@@ -323,10 +334,17 @@ internal class CActImplMtaiko : CActivity {
 				couse_symbol_y = OpenTaiko.Skin.Game_CourseSymbol_Y[i];
 			}
 
-			ModIcons.tDisplayMods(modIcons_x, modIcons_y, i);
+			var _ro = LuaROActivityWrapper.GetROActivity("modicons");
+			if (_ro != null && !_ro.IsActive) _ro.Activate();
+			if (_ro != null) {
+				var args = this.modIconsArgs[i] ??= new object[] { 0, 0, i, "game" };
+				CLuaScript.SetArg(args, 0, modIcons_x);
+				CLuaScript.SetArg(args, 1, modIcons_y);
+				_ro.Draw(args);
+			}
 
-			if (OpenTaiko.Tx.Couse_Symbol[OpenTaiko.stageSongSelect.nChoosenSongDifficulty[i]] != null) {
-				OpenTaiko.Tx.Couse_Symbol[OpenTaiko.stageSongSelect.nChoosenSongDifficulty[i]].t2D描画(
+			if (OpenTaiko.Tx.Couse_Symbol[OpenTaiko.SongMount.nChoosenSongDifficulty[i]] != null) {
+				OpenTaiko.Tx.Couse_Symbol[OpenTaiko.SongMount.nChoosenSongDifficulty[i]]!.t2DDraw(
 					couse_symbol_x,
 					couse_symbol_y
 				);
@@ -335,7 +353,7 @@ internal class CActImplMtaiko : CActivity {
 
 			if (OpenTaiko.ConfigIni.ShinuchiMode) {
 				if (OpenTaiko.Tx.Couse_Symbol[(int)Difficulty.Total] != null) {
-					OpenTaiko.Tx.Couse_Symbol[(int)Difficulty.Total].t2D描画(
+					OpenTaiko.Tx.Couse_Symbol[(int)Difficulty.Total]!.t2DDraw(
 						couse_symbol_x,
 						couse_symbol_y
 					);
@@ -372,106 +390,42 @@ internal class CActImplMtaiko : CActivity {
 			OpenTaiko.NamePlate.tNamePlateDraw(namePlate_x, namePlate_y, i);
 
 			if (OpenTaiko.Tx.Taiko_PlayerNumber[i] != null) {
-				OpenTaiko.Tx.Taiko_PlayerNumber[i].t2D描画(playerNumber_x, playerNumber_y);
+				OpenTaiko.Tx.Taiko_PlayerNumber[i]!.t2DDraw(playerNumber_x, playerNumber_y);
 			}
 		}
 		return base.Draw();
 	}
 
-	public void tMtaikoEvent(int nChannel, int nHand, int nPlayer) {
-		CConfigIni configIni = OpenTaiko.ConfigIni;
-		bool bAutoPlay = configIni.bAutoPlay[nPlayer];
-		int playerShift = 5 * nPlayer;
-		var _gt = configIni.nGameType[OpenTaiko.GetActualPlayer(nPlayer)];
-
-		switch (nPlayer) {
-			case 1:
-				bAutoPlay = configIni.bAutoPlay[nPlayer] || OpenTaiko.ConfigIni.bAIBattleMode;
+	public void tMtaikoEvent(NotesManager.EInputType input, int nHand, int nPlayer) {
+		switch (input) {
+			case NotesManager.EInputType.Red:
+				this.stPadState[nPlayer, 2 + nHand].nBrightness = 8;
+				break;
+			case NotesManager.EInputType.RedBig:
+				this.stPadState[nPlayer, 2].nBrightness = 8;
+				this.stPadState[nPlayer, 3].nBrightness = 8;
+				break;
+			case NotesManager.EInputType.Blue:
+				this.stPadState[nPlayer, nHand].nBrightness = 8;
+				break;
+			case NotesManager.EInputType.BlueBig:
+				this.stPadState[nPlayer, 0].nBrightness = 8;
+				this.stPadState[nPlayer, 1].nBrightness = 8;
+				break;
+			case NotesManager.EInputType.Clap:
+				this.stPadState[nPlayer, 4].nBrightness = 8;
 				break;
 		}
-
-		if (!bAutoPlay) {
-			switch (nChannel) {
-				case 0x11:
-				case 0x13:
-				case 0x15:
-				case 0x16:
-				case 0x17: {
-						this.stパッド状態[2 + nHand + playerShift].n明るさ = 8;
-					}
-					break;
-				case 0x12: {
-						this.stパッド状態[nHand + playerShift].n明るさ = 8;
-					}
-					break;
-				case 0x14: {
-						if (_gt == EGameType.Konga) {
-							this.stパッド状態[4 + playerShift].n明るさ = 8;
-						} else {
-							this.stパッド状態[nHand + playerShift].n明るさ = 8;
-						}
-					}
-					break;
-
-			}
-		} else {
-			switch (nChannel) {
-				case 0x11:
-				case 0x15:
-				case 0x16:
-				case 0x17:
-				case 0x1F: {
-						this.stパッド状態[2 + nHand + playerShift].n明るさ = 8;
-					}
-					break;
-
-				case 0x13:
-				case 0x1A: {
-						if (_gt == EGameType.Konga) {
-							this.stパッド状態[0 + playerShift].n明るさ = 8;
-							this.stパッド状態[2 + playerShift].n明るさ = 8;
-						} else {
-							this.stパッド状態[2 + playerShift].n明るさ = 8;
-							this.stパッド状態[3 + playerShift].n明るさ = 8;
-						}
-					}
-					break;
-
-				case 0x12: {
-						this.stパッド状態[nHand + playerShift].n明るさ = 8;
-					}
-					break;
-
-				case 0x14:
-				case 0x1B: {
-						if (_gt == EGameType.Konga) {
-							this.stパッド状態[4 + playerShift].n明るさ = 8;
-						} else {
-							this.stパッド状態[0 + playerShift].n明るさ = 8;
-							this.stパッド状態[1 + playerShift].n明るさ = 8;
-						}
-
-					}
-					break;
-
-				case 0x101: {
-						this.stパッド状態[nHand + playerShift].n明るさ = 8;
-						this.stパッド状態[2 + (nHand == 0 ? 1 : 0) + playerShift].n明るさ = 8;
-						break;
-					}
-			}
-		}
-
 	}
 
 	public void tBranchEvent(CTja.ECourse After, int player, bool stopAnime = false) {
 		if (stopAnime) {
-			this.ctレベルアップダウン[player].Stop();
+			this.ctLevelUpDown![player].Stop();
 			this.Before[player] = this.After[player] = After;
 			return;
 		}
 		if (After != this.After[player])
-			this.ctレベルアップダウン[player] = new CCounter(0, 1000, 1, OpenTaiko.Timer);
+			this.ctLevelUpDown![player] = new CCounter(0, 1000, 1, OpenTaiko.Timer);
 
 		this.Before[player] = this.After[player];
 		this.After[player] = After;
@@ -500,11 +454,11 @@ internal class CActImplMtaiko : CActivity {
 			}
 
 
-			if (OpenTaiko.Tx.Couse_Symbol_Back[OpenTaiko.stageSongSelect.nChoosenSongDifficulty[i]] != null) {
+			if (OpenTaiko.Tx.Couse_Symbol_Back[OpenTaiko.SongMount.nChoosenSongDifficulty[i]] != null) {
 				int originX = 0;
 				int originY = 0;
-				int width = OpenTaiko.Tx.Couse_Symbol_Back[OpenTaiko.stageSongSelect.nChoosenSongDifficulty[i]].szTextureSize.Width;
-				int height = OpenTaiko.Tx.Couse_Symbol_Back[OpenTaiko.stageSongSelect.nChoosenSongDifficulty[i]].szTextureSize.Height;
+				int width = OpenTaiko.Tx.Couse_Symbol_Back[OpenTaiko.SongMount.nChoosenSongDifficulty[i]]!.szTextureSize.Width;
+				int height = OpenTaiko.Tx.Couse_Symbol_Back[OpenTaiko.SongMount.nChoosenSongDifficulty[i]]!.szTextureSize.Height;
 
 				if (OpenTaiko.ConfigIni.nPlayerCount == 5) {
 					originX = OpenTaiko.Skin.Game_CourseSymbol_Back_Rect_5P[0];
@@ -518,17 +472,17 @@ internal class CActImplMtaiko : CActivity {
 					height = OpenTaiko.Skin.Game_CourseSymbol_Back_Rect_4P[3];
 				}
 
-				OpenTaiko.Tx.Couse_Symbol_Back[OpenTaiko.stageSongSelect.nChoosenSongDifficulty[i]].t2D描画(
+				OpenTaiko.Tx.Couse_Symbol_Back[OpenTaiko.SongMount.nChoosenSongDifficulty[i]]!.t2DDraw(
 					couse_symbol_x,
 					couse_symbol_y,
 					new System.Drawing.RectangleF(originX, originY, width, height));
 			}
 
-			if (OpenTaiko.Tx.Couse_Symbol_Back_Flash[OpenTaiko.stageSongSelect.nChoosenSongDifficulty[i]] != null && !OpenTaiko.ConfigIni.SimpleMode) {
+			if (OpenTaiko.Tx.Couse_Symbol_Back_Flash[OpenTaiko.SongMount.nChoosenSongDifficulty[i]] != null && !OpenTaiko.ConfigIni.SimpleMode) {
 				int originX = 0;
 				int originY = 0;
-				int width = OpenTaiko.Tx.Couse_Symbol_Back[OpenTaiko.stageSongSelect.nChoosenSongDifficulty[i]].szTextureSize.Width;
-				int height = OpenTaiko.Tx.Couse_Symbol_Back[OpenTaiko.stageSongSelect.nChoosenSongDifficulty[i]].szTextureSize.Height;
+				int width = OpenTaiko.Tx.Couse_Symbol_Back_Flash[OpenTaiko.SongMount.nChoosenSongDifficulty[i]]!.szTextureSize.Width;
+				int height = OpenTaiko.Tx.Couse_Symbol_Back_Flash[OpenTaiko.SongMount.nChoosenSongDifficulty[i]]!.szTextureSize.Height;
 
 				if (OpenTaiko.ConfigIni.nPlayerCount == 5) {
 					originX = OpenTaiko.Skin.Game_CourseSymbol_Back_Rect_5P[0];
@@ -542,8 +496,8 @@ internal class CActImplMtaiko : CActivity {
 					height = OpenTaiko.Skin.Game_CourseSymbol_Back_Rect_4P[3];
 				}
 
-				OpenTaiko.Tx.Couse_Symbol_Back_Flash[OpenTaiko.stageSongSelect.nChoosenSongDifficulty[i]].Opacity = 255 - (int)((ctSymbolFlash[i].CurrentValue / 1000.0) * 255);
-				OpenTaiko.Tx.Couse_Symbol_Back_Flash[OpenTaiko.stageSongSelect.nChoosenSongDifficulty[i]].t2D描画(
+				OpenTaiko.Tx.Couse_Symbol_Back_Flash[OpenTaiko.SongMount.nChoosenSongDifficulty[i]]!.Opacity = 255 - (int)((ctSymbolFlash[i].CurrentValue / 1000.0) * 255);
+				OpenTaiko.Tx.Couse_Symbol_Back_Flash[OpenTaiko.SongMount.nChoosenSongDifficulty[i]]!.t2DDraw(
 					couse_symbol_x,
 					couse_symbol_y,
 					new System.Drawing.RectangleF(originX, originY, width, height));
@@ -556,28 +510,24 @@ internal class CActImplMtaiko : CActivity {
 	//-----------------
 	//構造体
 	[StructLayout(LayoutKind.Sequential)]
-	private struct STパッド状態 {
-		public int n明るさ;
+	private struct STPadState {
+		public int nBrightness;
 	}
 
 	//太鼓
-	private STパッド状態[] stパッド状態 = new STパッド状態[5 * 5];
-	private long nフラッシュ制御タイマ;
+	private STPadState[,] stPadState = new STPadState[5, 5]; // [iPlayer, iPad]
+	private long nFlashControlTimer;
 
 	//private CTexture[] txコースシンボル = new CTexture[ 6 ];
-	private string[] strCourseSymbolFileName;
 
 	//オプション
-	private CTexture txオプションパネル_HS;
-	private CTexture txオプションパネル_RANMIR;
-	private CTexture txオプションパネル_特殊;
-	private int nHS;
 
 	//譜面分岐
-	private CCounter[] ctレベルアップダウン;
-	public CTja.ECourse[] After;
-	public CTja.ECourse[] Before;
+	private CCounter[]? ctLevelUpDown;
+	public CTja.ECourse[] After = null!;
+	public CTja.ECourse[] Before = null!;
 	private CCounter[] ctSymbolFlash = new CCounter[5];
+	private readonly object[]?[] modIconsArgs = new object[]?[5];
 	//-----------------
 	#endregion
 

@@ -1,0 +1,15 @@
+{
+  "_comment": "French texts for the TV (tv.lua): its menu and the cutscene browser. Keys are stable ids; a missing id shows the English text (lang/en).",
+  "title": "Télé",
+  "menu_on": "Allumer",
+  "menu_off": "Éteindre",
+  "menu_rewatch": "Revoir les cinématiques",
+  "tab_songs": "Cinématiques des chansons",
+  "tab_videos": "Vidéos des chansons",
+  "intro": "Intro",
+  "outro": "Outro %d",
+  "unknown_song": "???",
+  "empty": "Aucune cinématique trouvée.",
+  "empty_videos": "Aucune vidéo de chanson trouvée.",
+  "waiting": "Réglage des chaînes… la liste des chansons est encore en préparation."
+}

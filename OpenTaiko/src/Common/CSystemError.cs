@@ -8,8 +8,8 @@ internal class CSystemError : CStage {
 	public bool GameCrashed = false;
 	public string ErrorMessage = "";
 
-	private CCachedFontRenderer _pfText = null;
-	private TitleTextureKey _ttkText = null;
+	private CCachedFontRenderer? _pfText = null;
+	private TitleTextureKey? _ttkText = null;
 
 	public enum Errno {
 		ENO_UNKNOWN = 0,
@@ -17,24 +17,32 @@ internal class CSystemError : CStage {
 		ENO_SKINNOTFOUND = 2,
 		ENO_PADINITFAILED = 3,
 		ENO_INPUTINITFAILED = 4,
-		ENO_SONGLISTINITFAILED = 5
+		ENO_SONGLISTINITFAILED = 5,
+		ENO_INVALIDSTAGENAME = 6,
+		ENO_BOOTNOTFOUND = 7,
+		ENO_TITLENOTFOUND = 8,
+		ENO_GLOBALCORESTAGE = 9
 	};
 
-	public void LoadError(Errno errno) {
+	public void LoadError(Errno errno, Exception? exception = null, string? message = null) {
 		GameCrashed = true;
 
 		// Head with the error code
-		ErrorMessage = "\n\nError Code " + ((int)errno).ToString("0000") + "\n\n";
+		ErrorMessage = $"\n\nError Code {((int)errno).ToString("0000")} ({errno.ToString()})\n\n";
 		ErrorMessage += "An error has occured.\n\n";
 
 		switch (errno) {
 			default:
 			case Errno.ENO_UNKNOWN: {
+					if (!string.IsNullOrEmpty(message))
+						ErrorMessage += message;
 					ErrorMessage += "Please try restarting OpenTaiko.";
 					break;
 				}
 			case Errno.ENO_NOAUDIODEVICE: {
 					ErrorMessage += "No audio device was found.\n";
+					if (!string.IsNullOrEmpty(message))
+						ErrorMessage += "Additional message: " + message;
 					ErrorMessage += "Please ensure that you have an active audio output display on your machine.\n";
 					ErrorMessage += "Additionally, check if your speakers or headset are not turned off.\n";
 					ErrorMessage += "If this does not resolve the issue, please try the troubleshooting feature on your OS.";
@@ -42,6 +50,8 @@ internal class CSystemError : CStage {
 				}
 			case Errno.ENO_SKINNOTFOUND: {
 					ErrorMessage += "No compatible skin was found.\n";
+					if (!string.IsNullOrEmpty(message))
+						ErrorMessage += "Additional message: " + message;
 					ErrorMessage += "Please ensure that you have a compatible skin within your System folder.\n";
 					ErrorMessage += "If you have not installed a skin, please do so through the OpenTaiko Hub (Skins tab).\n";
 					ErrorMessage += "If this does not resolve the issue, please try updating your skins through the OpenTaiko Hub.\n";
@@ -49,25 +59,59 @@ internal class CSystemError : CStage {
 				}
 			case Errno.ENO_PADINITFAILED: {
 					ErrorMessage += "The pad initialisation failed.\n";
+					if (!string.IsNullOrEmpty(message))
+						ErrorMessage += "Additional message: " + message;
 					ErrorMessage += "Please try the troubleshooting feature on your OS.";
 					break;
 				}
 			case Errno.ENO_INPUTINITFAILED: {
 					ErrorMessage += "The input device initialisation failed.\n";
+					if (!string.IsNullOrEmpty(message))
+						ErrorMessage += "Additional message: " + message;
 					ErrorMessage += "Please ensure that you are not using a faulty input device when launching the game.\n";
 					ErrorMessage += "If the device seems to work on other tasks, please try the troubleshooting feature on your OS.";
 					break;
 				}
 			case Errno.ENO_SONGLISTINITFAILED: {
 					ErrorMessage += "The song list initialisation failed.\n";
+					if (!string.IsNullOrEmpty(message))
+						ErrorMessage += "Additional message: " + message;
 					ErrorMessage += "Please try removing the songlist.db file within your OpenTaiko folder.";
 					break;
 				}
-
+			case Errno.ENO_INVALIDSTAGENAME: {
+					ErrorMessage += "The requested stage name was not found.\n";
+					ErrorMessage += "Please ensure that your skin is compatible with your current OpenTaiko version.\n";
+					ErrorMessage += "If you are currently making a Lua module, please ensure that the requested Lua Stage name exists.";
+					break;
+				}
+			case Errno.ENO_BOOTNOTFOUND: {
+					ErrorMessage += "The boot stage was not found in the selected skin.\n";
+					ErrorMessage += "Please ensure that your skin is compatible with your current OpenTaiko version.\n";
+					ErrorMessage += "If you are currently making a skin, please ensure that stage is present in your Modules/Stages/_boot folder.";
+					break;
+				}
+			case Errno.ENO_TITLENOTFOUND: {
+					ErrorMessage += "The title stage was not found in the selected skin.\n";
+					ErrorMessage += "Please ensure that your skin is compatible with your current OpenTaiko version.\n";
+					ErrorMessage += "If you are currently making a skin, please ensure that stage is present in your Modules/Stages/_title folder.";
+					break;
+				}
+			case Errno.ENO_GLOBALCORESTAGE: {
+					ErrorMessage += "A _boot or _title stage was found in the Global/Modules/Stages folder.\n";
+					if (!string.IsNullOrEmpty(message))
+						ErrorMessage += "Folder: " + message + "\n";
+					ErrorMessage += "These two stages belong to each skin and cannot be shared between skins.\n";
+					ErrorMessage += "Please move that folder into your skin's Modules/Stages folder, or remove it.";
+					break;
+				}
 		};
 
 		// Append a call to contact if necessary
 		ErrorMessage += "\nIf the error persists, please contact us through the links provided on the OpenTaiko Hub.";
+
+		if (exception != null)
+			ErrorMessage += "\n\nException: " + exception.ToString();
 	}
 
 	// Constructor
@@ -81,7 +125,7 @@ internal class CSystemError : CStage {
 	// CStage Implementation
 
 	public override void Activate() {
-		// Allocate the resource exceptionally on Activate as CreateManagedResource is conditionned to PreloadAssets
+		// Allocate the resource exceptionally on Activate as CreateManagedResource is conditioned to PreloadAssets
 		this._pfText = HPrivateFastFont.tInstantiateFont("", 20); // Force fallback font
 		base.Activate();
 	}
@@ -97,9 +141,9 @@ internal class CSystemError : CStage {
 	public override int Draw() {
 		if (!base.IsDeActivated) {
 			if (this._pfText != null) {
-				this._ttkText = new TitleTextureKey(ErrorMessage, this._pfText, Color.White, Color.Black, 1280);
+				this._ttkText = new TitleTextureKey(ErrorMessage, this._pfText, Color.White, Color.Black, 1920);
 				CTexture tmpTex = TitleTextureKey.ResolveTitleTexture(this._ttkText);
-				tmpTex.t2D描画(0, 0);
+				tmpTex.t2DDraw(0, 0);
 			}
 		}
 		return 0;

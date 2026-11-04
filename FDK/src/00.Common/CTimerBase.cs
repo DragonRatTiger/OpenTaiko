@@ -11,9 +11,14 @@ public abstract class CTimerBase : IDisposable {
 	public abstract long SystemTimeMs {
 		get;
 	}
-	public double SystemTimeMs_Double {
-		get;
-		set;
+	public virtual double SystemTimeMs_Double {
+		get => SystemTimeMs; // default implementation
+	}
+	public virtual long SystemTimeMsReal {
+		get => SystemTimeMs; // default implementation
+	}
+	public virtual double SystemTimeMsReal_Double {
+		get => SystemTimeMsReal; // default implementation
 	}
 	public abstract void Dispose();
 
@@ -25,10 +30,13 @@ public abstract class CTimerBase : IDisposable {
 			return (this.UpdateSystemTime - this.PrevResetTimeMs);
 		}
 		set {
-			if (this.StopCount > 0)
+			if (this.StopCount > 0) {
 				this.PrevResetTimeMs = this.PauseSystemTimeMs - value;
-			else
+				this.PrevResetTimeMs_Double = this.PauseSystemTimeMs_Double - value;
+			} else {
 				this.PrevResetTimeMs = this.UpdateSystemTime - value;
+				this.PrevResetTimeMs_Double = this.UpdateSystemTime_Double - value;
+			}
 		}
 	}
 	public long RealNowTimeMs {
@@ -36,7 +44,7 @@ public abstract class CTimerBase : IDisposable {
 			if (this.StopCount > 0)
 				return (this.PauseSystemTimeMs - this.PrevResetTimeMs);
 
-			return (this.SystemTimeMs - this.PrevResetTimeMs);
+			return (this.SystemTimeMsReal - this.PrevResetTimeMs);
 		}
 	}
 	public long PrevResetTimeMs {
@@ -53,10 +61,13 @@ public abstract class CTimerBase : IDisposable {
 			return (this.UpdateSystemTime_Double - this.PrevResetTimeMs_Double);
 		}
 		set {
-			if (this.StopCount > 0)
+			if (this.StopCount > 0) {
 				this.PrevResetTimeMs_Double = this.PauseSystemTimeMs_Double - value;
-			else
+				this.PrevResetTimeMs = this.PauseSystemTimeMs - (long)Math.Round(value);
+			} else {
 				this.PrevResetTimeMs_Double = this.UpdateSystemTime_Double - value;
+				this.PrevResetTimeMs = this.UpdateSystemTime - (long)Math.Round(value);
+			}
 		}
 	}
 	public double RealNowTimeMs_Double {
@@ -64,7 +75,7 @@ public abstract class CTimerBase : IDisposable {
 			if (this.StopCount > 0)
 				return (this.PauseSystemTimeMs_Double - this.PrevResetTimeMs_Double);
 
-			return (this.SystemTimeMs_Double - this.PrevResetTimeMs_Double);
+			return (this.SystemTimeMsReal_Double - this.PrevResetTimeMs_Double);
 		}
 	}
 	public double PrevResetTimeMs_Double {
@@ -72,7 +83,7 @@ public abstract class CTimerBase : IDisposable {
 		protected set;
 	}
 
-	public bool IsUnStoped {
+	public bool IsUnStopped {
 		get {
 			return (this.StopCount == 0);
 		}
@@ -80,8 +91,8 @@ public abstract class CTimerBase : IDisposable {
 
 	public void Reset() {
 		this.Update();
-		this.PrevResetTimeMs = this.UpdateSystemTime;
-		this.PauseSystemTimeMs = this.UpdateSystemTime;
+		this.PauseSystemTimeMs = this.PrevResetTimeMs = this.UpdateSystemTime;
+		this.PauseSystemTimeMs_Double = this.PrevResetTimeMs_Double = this.UpdateSystemTime_Double;
 		this.StopCount = 0;
 	}
 	public void Pause() {
@@ -118,6 +129,10 @@ public abstract class CTimerBase : IDisposable {
 		=> msGameTime + this.PrevResetTimeMs_Double;
 	public double SystemTimeToGameTime(double msSystemTime)
 		=> msSystemTime - this.PrevResetTimeMs_Double;
+	public double SystemTimeToFrameworkTime(double msSystemTime)
+		=> msSystemTime + (Game.dbTimeMs - this.SystemTimeMs);
+	public double FrameworkTimeToSystemTime(double msFrameworkTime)
+		=> msFrameworkTime + (this.SystemTimeMs - Game.dbTimeMs);
 
 	#region [ protected ]
 	//-----------------

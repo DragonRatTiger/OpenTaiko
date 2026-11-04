@@ -8,7 +8,7 @@ using static OpenTaiko.CTja;
 
 namespace OpenTaiko;
 
-public class VTTParser : IDisposable {
+public class VTTParser {
 	// TODO : timestamp tag support
 	[Flags]
 	private enum ParseMode {
@@ -33,58 +33,26 @@ public class VTTParser : IDisposable {
 		public string Language;
 	}
 
-	private static string[] _vttdelimiter;
+	private static string[] _vttdelimiter = new[] { "-->", "- >", "->" };
 
-	private static Regex regexTimestamp;
+	private static Regex regexTimestamp = new Regex(@"(-)?(([0-9]+):)?([0-9]+):([0-9]+)[,\\.]([0-9]+)");
 
-	private static Regex regexOffset;
-	private static Regex regexLang;
+	private static Regex regexOffset = new Regex(@"Offset:\s*(.*?(?=;|$))"); // i.e. "WEBVTT Offset: 00:01.001;" , "WEBVTT Offset: 1.001;"
+	private static Regex regexLang = new Regex(@"Language:\s*(.*?(?=;|$))"); // i.e. "WEBVTT Language: ja;"
 
-	private static bool isUsingLang;
+	private bool isUsingLang = false;
 
-	private bool _isDisposed;
 
-	public VTTParser() {
-		_vttdelimiter = new[] { "-->", "- >", "->" };
+	public VTTParser() { }
 
-		regexTimestamp = new Regex(@"(-)?(([0-9]+):)?([0-9]+):([0-9]+)[,\\.]([0-9]+)");
-
-		regexOffset = new Regex(@"Offset:\s*(.*?(?=;|$))"); // i.e. "WEBVTT Offset: 00:01.001;" , "WEBVTT Offset: 1.001;"
-		regexLang = new Regex(@"Language:\s*(.*?(?=;|$))"); // i.e. "WEBVTT Language: ja;"
-
-		isUsingLang = false;
-	}
-
-	#region Dispose stuff
-	public void Dispose() {
-		Dispose(true);
-		GC.SuppressFinalize(this);
-	}
-
-	protected virtual void Dispose(bool disposing) {
-		if (!_isDisposed && disposing) {
-			_vttdelimiter = null;
-			regexTimestamp = null;
-
-			regexOffset = null;
-			regexLang = null;
-
-			isUsingLang = false;
-
-			_isDisposed = true;
-		}
-
-	}
-	#endregion
-
-	internal List<STLYRIC> ParseVTTFile(string filepath, int order, long offset) {
-		List<STLYRIC> lrclist = new List<STLYRIC>();
+	// note: List<STLYRIC> is List of actual value, appending it to another list will copy alot
+	internal void ParseVTTFile(List<STLYRIC> lrclist, string filepath, long offset) {
 		List<string> lines = File.ReadAllLines(filepath).ToList();
 
 		#region Header data
 		if (!lines[0].StartsWith("WEBVTT")) {
 			Trace.TraceWarning("Aborting VTT parse at {0}. WebVTT header does not start with \"WEBVTT\".", filepath);
-			return lrclist;
+			return;
 		}
 		#endregion
 
@@ -111,7 +79,7 @@ public class VTTParser : IDisposable {
 				if (languageMatch.Success) {
 					if (!(languageMatch.Groups[1].Value.ToLower() == CLangManager.fetchLang())) {
 						Trace.TraceWarning("Aborting VTT parse at {0}. WebVTT header language does not match user's selected language.", filepath);
-						return lrclist;
+						return;
 					}
 				}
 				Match offsetMatch = regexOffset.Match(lines[i]);
@@ -128,7 +96,7 @@ public class VTTParser : IDisposable {
 				if (String.IsNullOrEmpty(lines[i])) {
 					if (!ignoreLyrics && lyricData.Count != 0) {
 						lyricData.RemoveAll(empty => String.IsNullOrEmpty(empty.Text));
-						lrclist.Add(CreateLyric(lyricData, order));
+						lrclist.Add(CreateLyric(lyricData, lrclist.Count));
 					}
 
 					lyricData = new List<LyricData>();
@@ -148,7 +116,7 @@ public class VTTParser : IDisposable {
 					lyricData = new List<LyricData>(); // Prevents chapters from being included by mistake
 
 					if (start > endTime && endTime != -1) {
-						lrclist.Add(CreateLyric(new List<LyricData>() { new LyricData() { timestamp = endTime + offset } }, order));
+						lrclist.Add(CreateLyric(new List<LyricData>() { new LyricData() { timestamp = endTime + offset } }, lrclist.Count));
 						// If new start timestamp is greater than old end timestamp,
 						// it is assumed there is a gap in-between displaying lyrics.
 					}
@@ -318,7 +286,7 @@ public class VTTParser : IDisposable {
 								break;
 						}
 					}
-					string betterDecode(string sourceText) {
+					string betterDecode(string? sourceText) {
 						if (sourceText == null) return "";
 						string decodeResult = "";
 						for (int i = 0; i < sourceText.Length; i++) {
@@ -348,10 +316,10 @@ public class VTTParser : IDisposable {
 		// Add last lyric to list
 		if (lyricData.Count > 0) {
 			lyricData.RemoveAll(empty => String.IsNullOrEmpty(empty.Text));
-			lrclist.Add(CreateLyric(lyricData, order));
+			lrclist.Add(CreateLyric(lyricData, lrclist.Count));
 		}
-		lrclist.Add(CreateLyric(new List<LyricData>() { new LyricData() { timestamp = endTime + offset } }, order));
-		return lrclist;
+		lrclist.Add(CreateLyric(new List<LyricData>() { new LyricData() { timestamp = endTime + offset } }, lrclist.Count));
+		return;
 
 	}
 	internal bool TryParseTimestamp(string input, out long startTime, out long endTime) {
@@ -402,12 +370,12 @@ public class VTTParser : IDisposable {
 		string text = String.Empty;
 
 		foreach (LyricData data in datalist) {
-			using (CCachedFontRenderer fastdraw = HPrivateFastFont.tInstantiateFont(OpenTaiko.Skin.Game_Lyric_FontName, OpenTaiko.Skin.Game_Lyric_FontSize, data.Style)) {
+			using (CCachedFontRenderer fastdraw = HPrivateFastFont.tInstantiateLyricFont(OpenTaiko.Skin.Game_Lyric_FontSize, data.Style)) {
 				SKBitmap textdrawing = fastdraw.DrawText(data.Text, data.ForeColor, data.BackColor, null, 30); // Draw main text
 
 				if (data.IsRuby) // ruby time
 				{
-					using (CCachedFontRenderer rubydraw = HPrivateFastFont.tInstantiateFont(OpenTaiko.Skin.Game_Lyric_FontName, OpenTaiko.Skin.Game_Lyric_FontSize / 2, data.Style)) {
+					using (CCachedFontRenderer rubydraw = HPrivateFastFont.tInstantiateLyricFont(OpenTaiko.Skin.Game_Lyric_FontSize / 2, data.Style)) {
 						SKBitmap ruby = rubydraw.DrawText(data.RubyText, data.ForeColor, data.BackColor, null, 30);
 						Size size = new Size(textdrawing.Width > ruby.Width ? textdrawing.Width : ruby.Width, textdrawing.Height + (OpenTaiko.Skin.Game_Lyric_VTTRubyOffset + (ruby.Height / 2)));
 						SKBitmap fullruby = new SKBitmap(size.Width, size.Height);
@@ -454,7 +422,7 @@ public class VTTParser : IDisposable {
 			max_height += height[i];
 		}
 
-		SKBitmap lyrictex = new SKBitmap(max_width > 0 ? max_width : 1, max_height - rubyheightoffset.Sum() > 0 ? max_height - rubyheightoffset.Sum() : 1); // Prevent exception with 0x0y Bitmap
+		SKBitmap lyrictex = new SKBitmap(Math.Max(max_width, 1), Math.Max(max_height - rubyheightoffset.Sum(), 1)); // Prevent exception with 0x0y Bitmap
 
 		if (textures.Count > 0) {
 			using (SKCanvas canvas = new SKCanvas(lyrictex)) {

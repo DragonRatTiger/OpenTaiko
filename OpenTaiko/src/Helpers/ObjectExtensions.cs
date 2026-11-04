@@ -1,33 +1,33 @@
 ﻿using System.ArrayExtensions;
 using System.Globalization;
 using System.Reflection;
+using System.Text;
 using System.Text.RegularExpressions;
-using OpenTaiko;
 
 // https://github.com/Burtsev-Alexey/net-object-deep-copy/blob/master/ObjectExtensions.cs
 
 namespace System {
 	public static class ObjectExtensions {
-		private static readonly MethodInfo CloneMethod = typeof(Object).GetMethod("MemberwiseClone", BindingFlags.NonPublic | BindingFlags.Instance);
+		private static readonly MethodInfo CloneMethod = typeof(Object).GetMethod("MemberwiseClone", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
 		public static bool IsPrimitive(this Type type) {
 			if (type == typeof(String)) return true;
 			return (type.IsValueType & type.IsPrimitive);
 		}
 
-		public static Object Copy(this Object originalObject) {
+		public static Object? Copy(this Object? originalObject) {
 			return InternalCopy(originalObject, new Dictionary<Object, Object>(new ReferenceEqualityComparer()));
 		}
-		private static Object InternalCopy(Object originalObject, IDictionary<Object, Object> visited) {
+		private static Object? InternalCopy(Object? originalObject, IDictionary<Object, Object> visited) {
 			if (originalObject == null) return null;
 			var typeToReflect = originalObject.GetType();
 			if (IsPrimitive(typeToReflect)) return originalObject;
 			if (visited.ContainsKey(originalObject)) return visited[originalObject];
 			if (typeof(Delegate).IsAssignableFrom(typeToReflect)) return null;
-			var cloneObject = CloneMethod.Invoke(originalObject, null);
+			var cloneObject = CloneMethod.Invoke(originalObject, null)!;
 			if (typeToReflect.IsArray) {
 				var arrayType = typeToReflect.GetElementType();
-				if (IsPrimitive(arrayType) == false) {
+				if (IsPrimitive(arrayType!) == false) {
 					Array clonedArray = (Array)cloneObject;
 					clonedArray.ForEach((array, indices) => array.SetValue(InternalCopy(clonedArray.GetValue(indices), visited), indices));
 				}
@@ -46,7 +46,7 @@ namespace System {
 			}
 		}
 
-		private static void CopyFields(object originalObject, IDictionary<object, object> visited, object cloneObject, Type typeToReflect, BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy, Func<FieldInfo, bool> filter = null) {
+		private static void CopyFields(object originalObject, IDictionary<object, object> visited, object cloneObject, Type typeToReflect, BindingFlags bindingFlags = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.FlattenHierarchy, Func<FieldInfo, bool>? filter = null) {
 			foreach (FieldInfo fieldInfo in typeToReflect.GetFields(bindingFlags)) {
 				if (filter != null && filter(fieldInfo) == false) continue;
 				if (IsPrimitive(fieldInfo.FieldType)) continue;
@@ -56,12 +56,12 @@ namespace System {
 			}
 		}
 		public static T Copy<T>(this T original) {
-			return (T)Copy((Object)original);
+			return (T)Copy((Object?)original)!;
 		}
 	}
 
 	public class ReferenceEqualityComparer : EqualityComparer<Object> {
-		public override bool Equals(object x, object y) {
+		public override bool Equals(object? x, object? y) {
 			return ReferenceEquals(x, y);
 		}
 		public override int GetHashCode(object obj) {
@@ -113,7 +113,7 @@ namespace System {
 	public static class StringExtensions {
 		// TagRegex and RemoveTags are copies of TagRegex and Purify from the CSkiaSharpTextRenderer class (Have two instances because of both being in 2 different projects)
 
-		private const string TagRegex = @"<(/?)([gc](?:\.#[0-9a-fA-F]{6})*?)>";
+		private const string TagRegex = @"<(/?)([gc](?:\.#[0-9a-fA-F]{6})*?)(?:\[(\d+(?:\.\d+)?)\])?>";
 
 		public static string TrimStringWithTags(this string input, int maxLength) {
 			// This will store the result
@@ -175,7 +175,7 @@ namespace System {
 			while (openTags.Count > 0) {
 				string openTag = openTags.Pop();
 				// Convert the opening tag to its closing counterpart
-				string tagName = new Regex(@"<([gc](?:\.#[0-9a-fA-F]{6})*?)>").Match(openTag).Groups[1].Value;
+				string tagName = new Regex(TagRegex).Match(openTag).Groups[2].Value;
 				result += $"</{tagName[0]}>";
 			}
 
@@ -188,6 +188,15 @@ namespace System {
 
 		public static string EscapeSingleQuotes(this string input) {
 			return input.Replace(@"'", @"''");
+		}
+
+		// the longest start of the string that fits in maxBytes of UTF-8, never cutting inside a character
+		public static string TruncateUtf8(this string input, int maxBytes) {
+			if (Encoding.UTF8.GetByteCount(input) <= maxBytes) return input;
+			byte[] bytes = Encoding.UTF8.GetBytes(input);
+			int length = maxBytes;
+			while (length > 0 && (bytes[length] & 0xC0) == 0x80) length--; // step back off continuation bytes
+			return Encoding.UTF8.GetString(bytes, 0, length);
 		}
 
 		public static string SafeFormat(this string format, params object?[] args) {
@@ -218,61 +227,53 @@ namespace System {
 			return filteredParts;
 		}
 
+		private static readonly Regex InfRegex = new Regex(@"inf(?:inity)?", RegexOptions.IgnoreCase);
+
+		public static string NormalizeInf(this string input)
+			=> InfRegex.Replace(input, "Infinity");
+
+		public static float ParseRealF(this string input)
+			=> float.Parse(NormalizeInf(input));
+
+		public static double ParseReal(this string input)
+			=> double.Parse(NormalizeInf(input));
+
+		private static readonly Regex ComplexComponentDelimRegex = new Regex(@"(?<=[^e\s])\s*(?=[+-])|(?<=[^e\s])\s+(?=[^e\s])", RegexOptions.IgnoreCase);
+
 		public static double[] ParseComplex(this string input) {
 			try {
-				// Removing all spaces from the input for easier processing
-				var str = input.Replace(" ", "").ToLower();
+				double[] ri = [0, 0];
+				int idxRI = 0;
 
-				double real = 0;
-				double imaginary = 0;
-
-				// If the input contains 'i', we need to handle the imaginary part
-				if (str.Contains("i")) {
-					// Special cases for 'i', '-i', '1+i', '1-i'
-					if (str == "i") {
-						imaginary = 1;
-					} else if (str == "-i") {
-						imaginary = -1;
-					} else {
-						// Remove 'i' for further processing
-						str = str.Replace("i", "");
-
-						// Check if input ends with '+' or '-', meaning it was something like '1+i' or '1-i'
-						if (str.EndsWith("+") || str.EndsWith("-")) {
-							real = double.Parse(str.TrimEnd('+', '-'), CultureInfo.InvariantCulture);
-							imaginary = str.EndsWith("+") ? 1 : -1;
-						} else {
-							// Split the input into real and imaginary parts
-							string[] parts = str.Split(new[] { '+', '-' }, StringSplitOptions.RemoveEmptyEntries);
-
-							// If starts by - (fix for -1+3i, etc)
-							double factor = str.StartsWith("-") ? -1 : 1;
-
-							if (str.Contains("+")) {
-								real = double.Parse(parts[0], CultureInfo.InvariantCulture);
-								imaginary = double.Parse(parts[1], CultureInfo.InvariantCulture);
-							} else if (str.LastIndexOf('-') > 0) // handling cases like "1-2i"
-								{
-								real = double.Parse(parts[0], CultureInfo.InvariantCulture);
-								imaginary = -double.Parse(parts[1], CultureInfo.InvariantCulture);
-							} else if (str.StartsWith("-")) {
-								imaginary = -double.Parse(parts[0], CultureInfo.InvariantCulture);
-							} else {
-								imaginary = double.Parse(parts[0], CultureInfo.InvariantCulture);
-							}
-
-							real *= factor;
-						}
+				var parts = ComplexComponentDelimRegex.Split(input);
+				if (parts[0].EndsWith('i'))
+					idxRI = 1;
+				for (int i = 0, n = Math.Min(2 - idxRI, parts.Length); i < n; ++i) {
+					var part = parts[i];
+					part = part.NormalizeInf().Replace(" ", "");
+					if (idxRI + i == 1 && part.EndsWith('i')) {
+						part = part.TrimEnd('i');
+						if (part.Length == 0 || part[part.Length - 1] is '+' or '-') // +i/-i/i
+							part += '1';
 					}
-				} else {
-					// If there is no 'i', it is purely a real number
-					real = double.Parse(str, CultureInfo.InvariantCulture);
+					ri[idxRI + i] = double.Parse(part, CultureInfo.InvariantCulture);
 				}
 
-				return new double[] { real, imaginary };
-			} catch (FormatException ex) {
+				return ri;
+			} catch (Exception ex) {
 				throw new FormatException($"The input string '{input}' was not in a correct format.", ex);
 			}
 		}
 	}
+
+	public static class DirectoryUtils {
+		public static IEnumerable<string> SafeGetDirectories(string path, string searchPattern = "*", SearchOption option = SearchOption.TopDirectoryOnly) {
+			try {
+				return Directory.GetDirectories(path, searchPattern, option);
+			} catch (Exception) {
+				return Enumerable.Empty<string>();
+			}
+		}
+	}
+
 }
