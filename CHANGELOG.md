@@ -1,11 +1,17 @@
 # Changelog
 
+## [0.7.0.7] - 2026-11-08 (Beta)
+
+- [Feat] Add extra my room items
+- [Enhancement] Minor global modules UI enhancements
+- [Enhancement] Contacts page in the phone for numbers you got from other characters
+
+## [0.7.0.6] - 2026-11-07 (Beta)
+
+- [Enhancement] 3D engine minor additions and optimizations
+
 ## [0.7.0.5] - 2026-11-04 (Beta)
 
-- [Feat] Allow to sell no longer used furniture via the recycle bin
-- [Feat] Support decimal difficulties on dans
-- [Feat] Support custom metadata on .optktci/m/t charts
-- [Enhancement] Improve My Room's Workbench UI and make the Placeholder Matrix colorable
 - [Feat] Allow to sell no longer used furniture via the recycle bin
 - [Feat] Support decimal difficulties on dans
 - [Feat] Support custom metadata on .optktci/m/t charts
